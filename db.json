@@ -1,0 +1,8 @@
+{
+  "canchas": [
+    { "id": 1, "nombre": "Vóley 1", "deporte": "voley", "precioHora": 40 },
+    { "id": 2, "nombre": "Fútbol", "deporte": "futbol", "precioHora": 60 }
+  ],
+  "alquileres": [],
+  "clientes": []
+}
