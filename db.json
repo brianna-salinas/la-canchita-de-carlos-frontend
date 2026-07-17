@@ -1,8 +1,65 @@
 {
   "canchas": [
-    { "id": 1, "nombre": "Vóley 1", "deporte": "voley", "precioHora": 40 },
-    { "id": 2, "nombre": "Fútbol", "deporte": "futbol", "precioHora": 60 }
+    { "id": 1, "nombre": "Cancha 1", "deporte": "futbol", "precioHora": 40 },
+    { "id": 2, "nombre": "Cancha 2", "deporte": "voley", "precioHora": 60 }
   ],
-  "alquileres": [],
-  "clientes": []
+  "clientes": [
+    { "id": 1, "nombre": "Juan Pérez", "telefono": "51987654321" },
+    { "id": 2, "nombre": "Ricardo Gómez", "telefono": "51987654322" },
+    { "id": 3, "nombre": "Ana Beltrán", "telefono": "51987654323" }
+  ],
+  "alquileres": [
+    {
+      "id": 1,
+      "canchaId": 1,
+      "canchaNombre": "Cancha 1",
+      "clienteId": 1,
+      "clienteNombre": "Juan Pérez",
+      "fecha": "2026-07-11",
+      "horaInicio": "18:00",
+      "horaFin": "19:00",
+      "estado": "RESERVADO",
+      "estadoPago": "PAGADO",
+      "montoTotal": 40,
+      "montoPagado": 40
+    },
+    {
+      "id": 2,
+      "canchaId": 2,
+      "canchaNombre": "Cancha 2",
+      "clienteId": 2,
+      "clienteNombre": "Ricardo Gómez",
+      "fecha": "2026-07-11",
+      "horaInicio": "19:00",
+      "horaFin": "20:00",
+      "estado": "RESERVADO",
+      "estadoPago": "PARCIAL",
+      "montoTotal": 60,
+      "montoPagado": 20
+    },
+    {
+      "id": 3,
+      "canchaId": 1,
+      "canchaNombre": "Cancha 1",
+      "clienteId": 3,
+      "clienteNombre": "Ana Beltrán",
+      "fecha": "2026-07-11",
+      "horaInicio": "21:00",
+      "horaFin": "22:00",
+      "estado": "RESERVADO",
+      "estadoPago": "PENDIENTE",
+      "montoTotal": 40,
+      "montoPagado": 0
+    }
+  ],
+  "usuarios": [
+    {
+      "id": "1",
+      "nombre": "Carlos Maldonado",
+      "correo": "carlos@lacanchita.com",
+      "password": "canchita123",
+      "esDueno": true,
+      "estado": "ACTIVO"
+    }
+  ]
 }

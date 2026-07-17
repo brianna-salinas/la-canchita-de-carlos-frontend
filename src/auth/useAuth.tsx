@@ -6,6 +6,9 @@ interface AuthUser {
   nombre: string;
   correo: string;
   esDueno: boolean;
+  /** URL de foto de perfil. Si no existe, la UI muestra un ícono
+   * genérico de usuario en su lugar. */
+  fotoUrl?: string;
 }
 
 interface AuthContextValue {
