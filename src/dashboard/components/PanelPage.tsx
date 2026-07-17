@@ -381,7 +381,9 @@ export default function PanelPage() {
             Privacidad
           </a>
           <a
-            href="#"
+            href="https://api.whatsapp.com/send?phone=982040488"
+            target="_blank"
+            rel="noopener noreferrer"
             className="font-sans text-xs text-neutral-400 hover:text-neutral-600"
           >
             Soporte
