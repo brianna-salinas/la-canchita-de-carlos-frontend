@@ -5,8 +5,11 @@ export interface Alquiler {
   id: number;
   canchaId: number;
   canchaNombre: string;
-  clienteId: number;
+  clienteId: number | null;
   clienteNombre: string;
+  /** Ej. "Fútbol 5", "Entrenamiento", "Torneo Vóley Mix". Opcional:
+   * no todos los registros antiguos lo tienen. */
+  tipo?: string;
   fecha: string;
   horaInicio: string;
   horaFin: string;

@@ -1,16 +1,40 @@
 {
   "canchas": [
-    { "id": 1, "nombre": "Cancha 1", "deporte": "futbol", "precioHora": 40 },
-    { "id": 2, "nombre": "Cancha 2", "deporte": "voley", "precioHora": 60 }
+    {
+      "id": "1",
+      "nombre": "Cancha 1",
+      "deporte": "futbol",
+      "precioHora": 40
+    },
+    {
+      "id": "2",
+      "nombre": "Cancha 2",
+      "deporte": "voley",
+      "precioHora": 60
+    }
   ],
   "clientes": [
-    { "id": 1, "nombre": "Juan Pérez", "telefono": "51987654321" },
-    { "id": 2, "nombre": "Ricardo Gómez", "telefono": "51987654322" },
-    { "id": 3, "nombre": "Ana Beltrán", "telefono": "51987654323" }
+    {
+      "id": "1",
+      "nombre": "Juan Pérez",
+      "telefono": "51987654321",
+      "dni": "345345"
+    },
+    {
+      "id": "2",
+      "nombre": "Ricardo Gómez",
+      "telefono": "51987654322",
+      "dni": "dfgdg"
+    },
+    {
+      "id": "3",
+      "nombre": "Ana Beltrán",
+      "telefono": "51987654323"
+    }
   ],
   "alquileres": [
     {
-      "id": 1,
+      "id": "1",
       "canchaId": 1,
       "canchaNombre": "Cancha 1",
       "clienteId": 1,
@@ -24,7 +48,7 @@
       "montoPagado": 40
     },
     {
-      "id": 2,
+      "id": "2",
       "canchaId": 2,
       "canchaNombre": "Cancha 2",
       "clienteId": 2,
@@ -38,7 +62,7 @@
       "montoPagado": 20
     },
     {
-      "id": 3,
+      "id": "3",
       "canchaId": 1,
       "canchaNombre": "Cancha 1",
       "clienteId": 3,
@@ -61,5 +85,6 @@
       "esDueno": true,
       "estado": "ACTIVO"
     }
-  ]
+  ],
+  "$schema": "./node_modules/json-server/schema.json"
 }

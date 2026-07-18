@@ -78,6 +78,10 @@ export default function LoginPage() {
             como borde propio en desktop; en mobile ya está dentro de
             la tarjeta de arriba). */}
         <div className="md:rounded-2xl md:border md:border-neutral-200 md:shadow-sm md:p-6">
+          <h2 className="font-sans font-bold text-2xl text-neutral-900 text-center mb-5">
+            Inicia sesión
+          </h2>
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="font-sans text-base text-neutral-700 mb-1 block">
