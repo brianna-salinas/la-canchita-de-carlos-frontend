@@ -69,15 +69,19 @@ export default function CanchasPage() {
 
   async function eliminarCancha(id: number) {
     if (!window.confirm('¿Eliminar esta cancha? Esta acción no se puede deshacer.')) return
-    await apiClient.delete(`/canchas/${id}`)
-    await queryClient.invalidateQueries({ queryKey: ['canchas'] })
+    try {
+      await apiClient.delete(`/canchas/${id}`)
+      await queryClient.invalidateQueries({ queryKey: ['canchas'] })
+    } catch {
+      window.alert('No se pudo eliminar la cancha. Intenta de nuevo.')
+    }
   }
 
   function CardCancha({ c }: { c: (typeof canchasConDatos)[number] }) {
     const enMantenimiento = c.estado === 'MANTENIMIENTO'
     const Icon = deporteIcono(c.deporte)
     return (
-      <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
+      <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden">
         <div className={`relative h-36 bg-gradient-to-br ${gradientePorId(c.id)} flex items-center justify-center`}>
           {c.fotoUrl ? (
             <img src={c.fotoUrl} alt={c.nombre} className="absolute inset-0 h-full w-full object-cover" />
@@ -95,28 +99,28 @@ export default function CanchasPage() {
 
         <div className="p-4">
           <div className="flex items-start justify-between gap-2">
-            <p className="font-sans font-bold text-base text-neutral-900">{c.nombre}</p>
+            <p className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50">{c.nombre}</p>
             <p className="font-sans font-bold text-brand-primary whitespace-nowrap">
               S/{c.precioHora.toFixed(2)}
-              <span className="font-sans font-normal text-xs text-neutral-400"> /hora</span>
+              <span className="font-sans font-normal text-xs text-neutral-400 dark:text-neutral-500"> /hora</span>
             </p>
           </div>
-          <p className="flex items-center gap-1.5 font-sans text-sm text-neutral-500 mt-1">
-            <Icon className="h-3.5 w-3.5 text-neutral-400" />
+          <p className="flex items-center gap-1.5 font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+            <Icon className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" />
             {c.deporte}
           </p>
 
-          <div className="mt-3 pt-3 border-t border-neutral-100 flex items-center justify-between">
+          <div className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700/60 flex items-center justify-between">
             {enMantenimiento ? (
               <span className="font-sans text-sm text-warning">En mantenimiento</span>
             ) : c.reservasHoy.length === 0 ? (
-              <span className="font-sans text-sm text-neutral-400">Sin reservas para hoy</span>
+              <span className="font-sans text-sm text-neutral-400 dark:text-neutral-500">Sin reservas para hoy</span>
             ) : (
               <div className="flex items-center gap-1.5">
                 {c.reservasHoy.slice(0, 2).map((r) => (
                   <span
                     key={r.id}
-                    className="h-7 px-2 rounded-full bg-neutral-100 text-neutral-600 font-sans text-xs font-semibold flex items-center justify-center"
+                    className="h-7 px-2 rounded-full bg-neutral-100 dark:bg-neutral-700/60 text-neutral-600 dark:text-neutral-300 font-sans text-xs font-semibold flex items-center justify-center"
                   >
                     {r.horaInicio.slice(0, 2)}h
                   </span>
@@ -133,14 +137,14 @@ export default function CanchasPage() {
               <button
                 onClick={() => navigate(`/canchas/${c.id}/editar`)}
                 aria-label="Editar cancha"
-                className="text-neutral-400 hover:text-brand-primary"
+                className="text-neutral-400 dark:text-neutral-500 hover:text-brand-primary"
               >
                 <Pencil className="h-4 w-4" />
               </button>
               <button
                 onClick={() => eliminarCancha(c.id)}
                 aria-label="Eliminar cancha"
-                className="text-neutral-400 hover:text-danger"
+                className="text-neutral-400 dark:text-neutral-500 hover:text-danger"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -152,14 +156,14 @@ export default function CanchasPage() {
   }
 
   return (
-    <AppShell searchPlaceholder="Buscar canchas, reservas o socios...">
+    <AppShell showSearch={false}>
       {/* ================= DESKTOP ================= */}
       <div className="hidden md:flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-sans font-bold text-3xl text-neutral-900">
+          <h1 className="font-sans font-bold text-3xl text-neutral-900 dark:text-neutral-50">
             Gestión de Canchas
           </h1>
-          <p className="font-sans text-base text-neutral-500 mt-1">
+          <p className="font-sans text-base text-neutral-500 dark:text-neutral-400 mt-1">
             Administra y configura las canchas disponibles en el sistema.
           </p>
         </div>
@@ -173,31 +177,31 @@ export default function CanchasPage() {
       </div>
 
       <div className="hidden md:grid grid-cols-3 gap-4 mt-6">
-        <div className="bg-white rounded-2xl border border-neutral-200 p-5 flex items-center gap-4">
+        <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5 flex items-center gap-4">
           <span className="h-11 w-11 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">
             <Goal className="h-5 w-5" />
           </span>
           <div>
-            <p className="font-sans text-xs text-neutral-500 uppercase font-semibold">Total Canchas</p>
-            <p className="font-sans text-xl font-bold text-neutral-900">{total}</p>
+            <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold">Total Canchas</p>
+            <p className="font-sans text-xl font-bold text-neutral-900 dark:text-neutral-50">{total}</p>
           </div>
         </div>
-        <div className="bg-white rounded-2xl border border-neutral-200 p-5 flex items-center gap-4">
+        <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5 flex items-center gap-4">
           <span className="h-11 w-11 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
             <CircleCheck className="h-5 w-5" />
           </span>
           <div>
-            <p className="font-sans text-xs text-neutral-500 uppercase font-semibold">Activas</p>
-            <p className="font-sans text-xl font-bold text-neutral-900">{activas}</p>
+            <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold">Activas</p>
+            <p className="font-sans text-xl font-bold text-neutral-900 dark:text-neutral-50">{activas}</p>
           </div>
         </div>
-        <div className="bg-white rounded-2xl border border-neutral-200 p-5 flex items-center gap-4">
+        <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5 flex items-center gap-4">
           <span className="h-11 w-11 rounded-full bg-warning/10 text-warning flex items-center justify-center shrink-0">
             <Wrench className="h-5 w-5" />
           </span>
           <div>
-            <p className="font-sans text-xs text-neutral-500 uppercase font-semibold">Mantenimiento</p>
-            <p className="font-sans text-xl font-bold text-neutral-900">
+            <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold">Mantenimiento</p>
+            <p className="font-sans text-xl font-bold text-neutral-900 dark:text-neutral-50">
               {String(mantenimiento).padStart(2, '0')}
             </p>
           </div>
@@ -211,7 +215,7 @@ export default function CanchasPage() {
         </p>
       )}
       {isLoading && (
-        <p className="hidden md:block font-sans text-sm text-neutral-400 mt-6">
+        <p className="hidden md:block font-sans text-sm text-neutral-400 dark:text-neutral-500 mt-6">
           Cargando canchas...
         </p>
       )}
@@ -223,13 +227,13 @@ export default function CanchasPage() {
 
         <button
           onClick={() => navigate('/canchas/nueva')}
-          className="border-2 border-dashed border-neutral-200 rounded-2xl flex flex-col items-center justify-center gap-3 py-10 text-neutral-400 hover:border-brand-primary hover:text-brand-primary transition-colors"
+          className="border-2 border-dashed border-neutral-200 dark:border-neutral-700 rounded-2xl flex flex-col items-center justify-center gap-3 py-10 text-neutral-400 dark:text-neutral-500 hover:border-brand-primary hover:text-brand-primary transition-colors"
         >
-          <span className="h-12 w-12 rounded-full bg-neutral-100 flex items-center justify-center">
+          <span className="h-12 w-12 rounded-full bg-neutral-100 dark:bg-neutral-700/60 flex items-center justify-center">
             <Plus className="h-6 w-6" />
           </span>
           <span className="font-sans font-semibold text-sm">Nueva Cancha</span>
-          <span className="font-sans text-xs text-neutral-400 px-6 text-center">
+          <span className="font-sans text-xs text-neutral-400 dark:text-neutral-500 px-6 text-center">
             Configurar nuevo espacio deportivo
           </span>
         </button>
@@ -239,7 +243,7 @@ export default function CanchasPage() {
         <div className="hidden md:flex justify-center mt-6">
           <button
             onClick={() => setVisibles((v) => v + PAGE_SIZE)}
-            className="h-11 px-6 rounded-lg border border-neutral-200 bg-white font-sans font-semibold text-sm text-neutral-600 hover:bg-neutral-50"
+            className="h-11 px-6 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 font-sans font-semibold text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50"
           >
             Cargar más canchas
           </button>
@@ -248,20 +252,20 @@ export default function CanchasPage() {
 
       {/* ================= MOBILE ================= */}
       <div className="md:hidden pb-24">
-        <h1 className="font-sans font-bold text-2xl text-neutral-900">Gestión de Canchas</h1>
+        <h1 className="font-sans font-bold text-2xl text-neutral-900 dark:text-neutral-50">Gestión de Canchas</h1>
 
         <div className="grid grid-cols-3 gap-2 mt-4">
-          <div className="bg-white rounded-xl border border-neutral-200 p-3 text-center">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-3 text-center">
             <p className="font-sans font-bold text-xl text-brand-primary">{total}</p>
-            <p className="font-sans text-xs text-neutral-500">Total</p>
+            <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400">Total</p>
           </div>
-          <div className="bg-white rounded-xl border border-neutral-200 p-3 text-center">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-3 text-center">
             <p className="font-sans font-bold text-xl text-success">{activas}</p>
-            <p className="font-sans text-xs text-neutral-500">Activas</p>
+            <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400">Activas</p>
           </div>
-          <div className="bg-white rounded-xl border border-neutral-200 p-3 text-center">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-3 text-center">
             <p className="font-sans font-bold text-xl text-warning">{mantenimiento}</p>
-            <p className="font-sans text-xs text-neutral-500">Manten.</p>
+            <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400">Manten.</p>
           </div>
         </div>
 
@@ -272,7 +276,7 @@ export default function CanchasPage() {
           </p>
         )}
         {isLoading && (
-          <p className="font-sans text-sm text-neutral-400 mt-4">Cargando canchas...</p>
+          <p className="font-sans text-sm text-neutral-400 dark:text-neutral-500 mt-4">Cargando canchas...</p>
         )}
 
         <div className="space-y-4 mt-4">
@@ -280,7 +284,7 @@ export default function CanchasPage() {
             const enMantenimiento = c.estado === 'MANTENIMIENTO'
             const Icon = deporteIcono(c.deporte)
             return (
-              <div key={c.id} className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
+              <div key={c.id} className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden">
                 <div className={`relative h-32 bg-gradient-to-br ${gradientePorId(c.id)} flex items-center justify-center`}>
                   {c.fotoUrl ? (
                     <img src={c.fotoUrl} alt={c.nombre} className="absolute inset-0 h-full w-full object-cover" />
@@ -292,33 +296,33 @@ export default function CanchasPage() {
                       enMantenimiento ? 'bg-warning text-white' : 'bg-success text-white'
                     }`}
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-white dark:bg-neutral-800" />
                     {enMantenimiento ? 'Mantenimiento' : 'Activa'}
                   </span>
                 </div>
                 <div className="p-3.5">
-                  <p className="font-sans font-bold text-sm text-neutral-900">{c.nombre}</p>
-                  <p className="flex items-center gap-1.5 font-sans text-xs text-neutral-500 mt-0.5">
-                    <Icon className="h-3.5 w-3.5 text-neutral-400" />
+                  <p className="font-sans font-bold text-sm text-neutral-900 dark:text-neutral-50">{c.nombre}</p>
+                  <p className="flex items-center gap-1.5 font-sans text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                    <Icon className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" />
                     {c.deporte}
                   </p>
                   <div className="flex items-center justify-between mt-3">
                     <p className="font-sans font-bold text-brand-primary text-base">
                       S/{c.precioHora.toFixed(0)}
-                      <span className="font-sans font-normal text-xs text-neutral-400"> /hr</span>
+                      <span className="font-sans font-normal text-xs text-neutral-400 dark:text-neutral-500"> /hr</span>
                     </p>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => navigate(`/canchas/${c.id}/editar`)}
                         aria-label="Editar cancha"
-                        className="h-8 w-8 rounded-lg border border-neutral-200 flex items-center justify-center text-brand-primary"
+                        className="h-8 w-8 rounded-lg border border-neutral-200 dark:border-neutral-700 flex items-center justify-center text-brand-primary"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => eliminarCancha(c.id)}
                         aria-label="Eliminar cancha"
-                        className="h-8 w-8 rounded-lg border border-neutral-200 flex items-center justify-center text-danger"
+                        className="h-8 w-8 rounded-lg border border-neutral-200 dark:border-neutral-700 flex items-center justify-center text-danger"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -330,7 +334,7 @@ export default function CanchasPage() {
           })}
         </div>
 
-        <p className="text-center font-sans text-xs text-neutral-400 mt-8">
+        <p className="text-center font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-8">
           Desarrollado por Brianna Salinas | 2026
         </p>
       </div>

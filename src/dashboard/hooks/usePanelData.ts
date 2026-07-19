@@ -17,6 +17,21 @@ export interface Alquiler {
   estadoPago: "PAGADO" | "PARCIAL" | "PENDIENTE";
   montoTotal: number;
   montoPagado: number;
+  /** "UNICA" (default) es una reserva de un solo día. "MULTIDIA" y
+   * "RECURRENTE" agrupan varios /alquileres bajo el mismo serieId
+   * (uno por fecha, ver NuevaReservaPage). Opcional: los registros
+   * antiguos no lo tienen y se tratan como UNICA. */
+  tipoReserva?: "UNICA" | "MULTIDIA" | "RECURRENTE";
+  /** Id compartido por todas las fechas de una misma serie
+   * (torneo de varios días, cliente recurrente semanal). */
+  serieId?: string;
+  /** "INDIVIDUAL": cada fecha se cobra y marca pagada por separado.
+   * "ACUMULADO": el cliente paga varias fechas juntas. */
+  serieModoPago?: "INDIVIDUAL" | "ACUMULADO";
+  /** Descripción legible de la serie, ej. "Reserva recurrente semanal (8 fechas)". */
+  serieEtiqueta?: string;
+  serieTotalFechas?: number;
+  serieIndice?: number;
 }
 
 // Trae los alquileres desde el fake API (json-server). Se reemplaza por

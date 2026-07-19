@@ -14,10 +14,13 @@ import {
   Goal,
   CalendarDays,
   SlidersHorizontal,
+  Repeat,
+  Landmark,
 } from 'lucide-react'
 import AppShell from '../../shared/components/AppShell'
 import { useCanchas, useReservas } from '../hooks/useCalendario'
 import { apiClient } from '../../shared/api/client'
+import { iniciales, formatFecha } from '../../shared/utils/format'
 
 // Fecha con datos de ejemplo en db.json. El chip "Hoy" filtra por
 // esta fecha mientras el dataset del fake API siga anclado a ella.
@@ -41,22 +44,6 @@ const ESTADO_ICONO: Record<string, typeof CircleCheck> = {
   PENDIENTE: Clock,
 }
 
-function iniciales(nombre: string) {
-  return nombre
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join('')
-}
-
-function formatFecha(fecha: string) {
-  const d = new Date(`${fecha}T00:00:00`)
-  return d
-    .toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
-    .replace('.', '')
-}
-
 export default function ReservasPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -75,12 +62,17 @@ export default function ReservasPage() {
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
   const [seleccionadas, setSeleccionadas] = useState<Set<number>>(new Set())
   const [confirmando, setConfirmando] = useState(false)
+  // Chip "Recurrentes / Series": muestra solo reservas que forman
+  // parte de una serie (tipoReserva MULTIDIA o RECURRENTE).
+  const [soloSeries, setSoloSeries] = useState(false)
+  const [marcandoSerie, setMarcandoSerie] = useState<string | null>(null)
 
   function limpiarFiltros() {
     setFechaInicio('')
     setFechaFin('')
     setCanchaFiltro('')
     setEstadoFiltro('')
+    setSoloSeries(false)
   }
 
   const chips = [
@@ -100,6 +92,14 @@ export default function ReservasPage() {
       apply: () => {
         limpiarFiltros()
         setEstadoFiltro('PENDIENTE')
+      },
+    },
+    {
+      id: 'recurrentes',
+      label: 'Recurrentes / Series',
+      apply: () => {
+        limpiarFiltros()
+        setSoloSeries(true)
       },
     },
     ...canchas.map((c) => ({
@@ -124,6 +124,7 @@ export default function ReservasPage() {
       if (fechaFin && r.fecha > fechaFin) return false
       if (canchaFiltro && String(r.canchaId) !== canchaFiltro) return false
       if (estadoFiltro && r.estadoPago !== estadoFiltro) return false
+      if (soloSeries && !r.serieId) return false
       if (q) {
         const idTexto = `res-${String(r.id).padStart(3, '0')}`
         const coincide =
@@ -132,7 +133,36 @@ export default function ReservasPage() {
       }
       return true
     })
-  }, [reservas, fechaInicio, fechaFin, canchaFiltro, estadoFiltro, busqueda])
+  }, [reservas, fechaInicio, fechaFin, canchaFiltro, estadoFiltro, soloSeries, busqueda])
+
+  // Cuántas fechas de la serie siguen pendientes/parciales, para el
+  // badge de cada tarjeta/fila que pertenece a una serie.
+  function pendientesDeSerie(serieId: string) {
+    return reservas.filter((r) => r.serieId === serieId && r.estadoPago !== 'PAGADO').length
+  }
+
+  async function marcarSeriePagada(serieId: string) {
+    if (!window.confirm('¿Marcar todas las fechas pendientes de esta serie como pagadas?')) return
+    setMarcandoSerie(serieId)
+    try {
+      // No hay endpoint de "series" en el fake API: se recorre cada
+      // /alquileres que comparte el serieId y se marca como pagado
+      // individualmente. Se reemplaza por PATCH
+      // /api/bookings/series/:serieId/payment cuando el backend esté
+      // conectado (Sprint 2).
+      const fechasDeLaSerie = reservas.filter((r) => r.serieId === serieId && r.estadoPago !== 'PAGADO')
+      await Promise.all(
+        fechasDeLaSerie.map((r) =>
+          apiClient.patch(`/alquileres/${r.id}`, { estadoPago: 'PAGADO', montoPagado: r.montoTotal }),
+        ),
+      )
+      await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
+    } catch {
+      window.alert('No se pudo marcar la serie como pagada. Intenta de nuevo.')
+    } finally {
+      setMarcandoSerie(null)
+    }
+  }
 
   function toggleSeleccion(id: number) {
     setSeleccionadas((prev) => {
@@ -169,6 +199,8 @@ export default function ReservasPage() {
       )
       await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
       setSeleccionadas(new Set())
+    } catch {
+      window.alert('No se pudo confirmar el pago. Intenta de nuevo.')
     } finally {
       setConfirmando(false)
     }
@@ -178,39 +210,43 @@ export default function ReservasPage() {
     if (!window.confirm('¿Eliminar esta reserva? Esta acción no se puede deshacer.')) {
       return
     }
-    await apiClient.delete(`/alquileres/${id}`)
-    await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
+    try {
+      await apiClient.delete(`/alquileres/${id}`)
+      await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
+    } catch {
+      window.alert('No se pudo eliminar la reserva. Intenta de nuevo.')
+    }
   }
 
   return (
     <AppShell searchPlaceholder="Buscar reservas o clientes..." minimalMobile>
       {/* Barra superior mobile */}
-      <div className="md:hidden sticky top-0 z-20 bg-white border-b border-neutral-200 px-4 py-4 flex items-center justify-between">
+      <div className="md:hidden sticky top-0 z-20 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} aria-label="Volver" className="text-neutral-900">
+          <button onClick={() => navigate(-1)} aria-label="Volver" className="text-neutral-900 dark:text-neutral-50">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <h1 className="font-sans font-bold text-lg text-neutral-900">Reservas</h1>
+          <h1 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50">Reservas</h1>
         </div>
         <button
           onClick={() => setFiltrosAbiertos((v) => !v)}
           aria-label="Más filtros"
-          className="text-neutral-500"
+          className="text-neutral-500 dark:text-neutral-400"
         >
           <SlidersHorizontal className="h-5 w-5" />
         </button>
       </div>
 
       {/* ================= MOBILE ================= */}
-      <div className="md:hidden px-4 py-4 pb-28 space-y-4 bg-neutral-50 min-h-screen">
+      <div className="md:hidden px-4 py-4 pb-28 space-y-4 bg-neutral-50 dark:bg-neutral-900 min-h-screen">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 dark:text-neutral-500" />
           <input
             type="text"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar por ID, cliente o teléfono..."
-            className="w-full h-11 pl-10 pr-3 rounded-lg border border-neutral-200 bg-white font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+            className="w-full h-11 pl-10 pr-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
           />
         </div>
 
@@ -222,7 +258,7 @@ export default function ReservasPage() {
               className={`shrink-0 h-9 px-4 rounded-full font-sans text-sm font-medium flex items-center gap-1.5 border ${
                 chipActivo === chip.id
                   ? 'bg-brand-primary border-brand-primary text-white'
-                  : 'bg-neutral-200/60 border-transparent text-neutral-600'
+                  : 'bg-neutral-200/60 border-transparent text-neutral-600 dark:text-neutral-300'
               }`}
             >
               {chipActivo === chip.id && <CircleCheck className="h-3.5 w-3.5" />}
@@ -232,10 +268,10 @@ export default function ReservasPage() {
         </div>
 
         {filtrosAbiertos && (
-          <div className="bg-white rounded-2xl border border-neutral-200 p-4 space-y-3">
+          <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-sans text-sm text-neutral-600 mb-1 block">
+                <label className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mb-1 block">
                   Desde
                 </label>
                 <input
@@ -245,11 +281,11 @@ export default function ReservasPage() {
                     setFechaInicio(e.target.value)
                     setChipActivo('')
                   }}
-                  className="w-full h-10 px-2 rounded-lg border border-neutral-200 font-sans text-sm"
+                  className="w-full h-10 px-2 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
                 />
               </div>
               <div>
-                <label className="font-sans text-sm text-neutral-600 mb-1 block">
+                <label className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mb-1 block">
                   Hasta
                 </label>
                 <input
@@ -259,7 +295,7 @@ export default function ReservasPage() {
                     setFechaFin(e.target.value)
                     setChipActivo('')
                   }}
-                  className="w-full h-10 px-2 rounded-lg border border-neutral-200 font-sans text-sm"
+                  className="w-full h-10 px-2 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
                 />
               </div>
             </div>
@@ -268,7 +304,7 @@ export default function ReservasPage() {
                 limpiarFiltros()
                 setChipActivo('todos')
               }}
-              className="w-full h-10 rounded-lg border border-neutral-200 font-sans text-sm font-medium text-neutral-600"
+              className="w-full h-10 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm font-medium text-neutral-600 dark:text-neutral-300"
             >
               Limpiar filtros
             </button>
@@ -283,10 +319,10 @@ export default function ReservasPage() {
         )}
 
         {isLoading && (
-          <p className="font-sans text-sm text-neutral-400">Cargando reservas...</p>
+          <p className="font-sans text-sm text-neutral-400 dark:text-neutral-500">Cargando reservas...</p>
         )}
         {!isLoading && reservasFiltradas.length === 0 && (
-          <p className="font-sans text-sm text-neutral-400">
+          <p className="font-sans text-sm text-neutral-400 dark:text-neutral-500">
             No hay reservas que coincidan con la búsqueda.
           </p>
         )}
@@ -296,8 +332,8 @@ export default function ReservasPage() {
           return (
             <div
               key={r.id}
-              className={`bg-white rounded-2xl border p-4 ${
-                seleccionada ? 'border-brand-primary ring-1 ring-brand-primary/30' : 'border-neutral-200'
+              className={`bg-white dark:bg-neutral-800 rounded-2xl border p-4 ${
+                seleccionada ? 'border-brand-primary ring-1 ring-brand-primary/30' : 'border-neutral-200 dark:border-neutral-700'
               }`}
             >
               <div className="flex items-start gap-3">
@@ -305,11 +341,11 @@ export default function ReservasPage() {
                   type="checkbox"
                   checked={seleccionada}
                   onChange={() => toggleSeleccion(r.id)}
-                  className="h-4 w-4 mt-1 rounded border-neutral-300 accent-brand-primary shrink-0"
+                  className="h-4 w-4 mt-1 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary shrink-0"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-sans text-xs text-neutral-400">
+                    <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500">
                       #RES-{String(r.id).padStart(3, '0')}
                     </p>
                     <span
@@ -318,33 +354,60 @@ export default function ReservasPage() {
                       {r.estadoPago === 'PAGADO' ? '✓ Pagado' : r.estadoPago === 'PARCIAL' ? 'Parcial' : '! Pendiente'}
                     </span>
                   </div>
-                  <p className="font-sans font-bold text-base text-neutral-900 mt-0.5 truncate">
+                  <p className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50 mt-0.5 truncate">
                     {r.clienteNombre}
                   </p>
 
                   <div className="flex items-center gap-4 mt-2">
-                    <span className="flex items-center gap-1.5 font-sans text-sm text-neutral-500">
-                      <Goal className="h-4 w-4 text-neutral-400" />
+                    <span className="flex items-center gap-1.5 font-sans text-sm text-neutral-500 dark:text-neutral-400">
+                      <Goal className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
                       {r.canchaNombre}
                     </span>
-                    <span className="flex items-center gap-1.5 font-sans text-sm text-neutral-500">
-                      <CalendarDays className="h-4 w-4 text-neutral-400" />
+                    <span className="flex items-center gap-1.5 font-sans text-sm text-neutral-500 dark:text-neutral-400">
+                      <CalendarDays className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
                       {formatFecha(r.fecha)}, {r.horaInicio}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100">
-                    <p className="font-sans text-sm text-neutral-500">
+                  {r.serieId && (
+                    <div className="mt-2">
+                      <span
+                        title={r.serieEtiqueta}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-brand-secondary/15 text-brand-primary px-2.5 py-1 font-sans text-[11px] font-semibold"
+                      >
+                        <Repeat className="h-3 w-3" />
+                        {r.serieIndice ?? '?'}/{r.serieTotalFechas ?? '?'} · {r.tipoReserva === 'RECURRENTE' ? 'Recurrente' : 'Serie'}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700/60">
+                    <p className="font-sans text-sm text-neutral-500 dark:text-neutral-400">
                       Total: <span className="font-bold text-brand-primary">S/{r.montoTotal}</span>
                     </p>
                     <div className="flex items-center gap-3">
-                      <button aria-label="Editar reserva" className="text-neutral-400">
+                      {r.serieId && pendientesDeSerie(r.serieId) > 0 && (
+                        <button
+                          onClick={() => marcarSeriePagada(r.serieId as string)}
+                          disabled={marcandoSerie === r.serieId}
+                          aria-label="Marcar serie como pagada"
+                          title={`Marcar ${pendientesDeSerie(r.serieId)} fecha(s) pendiente(s) de la serie como pagadas`}
+                          className="text-neutral-400 dark:text-neutral-500 hover:text-success disabled:opacity-50"
+                        >
+                          <Landmark className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => navigate(`/calendario/nueva-reserva/${r.id}/editar`)}
+                        aria-label="Editar reserva"
+                        className="text-neutral-400 dark:text-neutral-500"
+                      >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => eliminarReserva(r.id)}
                         aria-label="Eliminar reserva"
-                        className="text-neutral-400"
+                        className="text-neutral-400 dark:text-neutral-500"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -356,7 +419,7 @@ export default function ReservasPage() {
           )
         })}
 
-        <p className="text-center font-sans text-xs text-neutral-400 pt-4">
+        <p className="text-center font-sans text-xs text-neutral-400 dark:text-neutral-500 pt-4">
           Desarrollado por Brianna Salinas | 2026
         </p>
       </div>
@@ -385,10 +448,10 @@ export default function ReservasPage() {
       {/* ================= DESKTOP ================= */}
       <div className="hidden md:flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-sans font-bold text-3xl text-neutral-900">
+          <h1 className="font-sans font-bold text-3xl text-neutral-900 dark:text-neutral-50">
             Gestión de Reservas
           </h1>
-          <p className="font-sans text-base text-neutral-500 mt-1">
+          <p className="font-sans text-base text-neutral-500 dark:text-neutral-400 mt-1">
             Administra todas las reservas, pagos y estados de las canchas.
           </p>
         </div>
@@ -413,37 +476,37 @@ export default function ReservasPage() {
       </div>
 
       {/* Filtros (desktop) */}
-      <div className="hidden md:flex bg-white rounded-2xl border border-neutral-200 p-5 mt-6 flex-wrap items-end gap-4">
+      <div className="hidden md:flex bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5 mt-6 flex-wrap items-end gap-4">
         <div>
-          <label className="font-sans text-sm text-neutral-600 mb-1 block">
+          <label className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mb-1 block">
             Desde
           </label>
           <input
             type="date"
             value={fechaInicio}
             onChange={(e) => setFechaInicio(e.target.value)}
-            className="h-11 px-3 rounded-lg border border-neutral-200 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+            className="h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
           />
         </div>
         <div>
-          <label className="font-sans text-sm text-neutral-600 mb-1 block">
+          <label className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mb-1 block">
             Hasta
           </label>
           <input
             type="date"
             value={fechaFin}
             onChange={(e) => setFechaFin(e.target.value)}
-            className="h-11 px-3 rounded-lg border border-neutral-200 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+            className="h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
           />
         </div>
         <div>
-          <label className="font-sans text-sm text-neutral-600 mb-1 block">
+          <label className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mb-1 block">
             Cancha
           </label>
           <select
             value={canchaFiltro}
             onChange={(e) => setCanchaFiltro(e.target.value)}
-            className="h-11 px-3 rounded-lg border border-neutral-200 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+            className="h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50"
           >
             <option value="">Todas las canchas</option>
             {canchas.map((c) => (
@@ -454,13 +517,13 @@ export default function ReservasPage() {
           </select>
         </div>
         <div>
-          <label className="font-sans text-sm text-neutral-600 mb-1 block">
+          <label className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mb-1 block">
             Estado
           </label>
           <select
             value={estadoFiltro}
             onChange={(e) => setEstadoFiltro(e.target.value)}
-            className="h-11 px-3 rounded-lg border border-neutral-200 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+            className="h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50"
           >
             <option value="">Todos los estados</option>
             <option value="PAGADO">Pagado</option>
@@ -470,7 +533,7 @@ export default function ReservasPage() {
         </div>
         <button
           onClick={limpiarFiltros}
-          className="h-11 px-4 rounded-lg border border-neutral-200 font-sans text-sm font-medium text-neutral-600 flex items-center gap-2 hover:bg-neutral-50"
+          className="h-11 px-4 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm font-medium text-neutral-600 dark:text-neutral-300 flex items-center gap-2 hover:bg-neutral-50"
         >
           <Filter className="h-4 w-4" />
           Limpiar filtros
@@ -485,10 +548,10 @@ export default function ReservasPage() {
       )}
 
       {/* Tabla (desktop) */}
-      <div className="hidden md:block bg-white rounded-2xl border border-neutral-200 mt-6 overflow-x-auto">
+      <div className="hidden md:block bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 mt-6 overflow-x-auto">
         <table className="w-full min-w-[820px]">
           <thead>
-            <tr className="text-left border-b border-neutral-100">
+            <tr className="text-left border-b border-neutral-100 dark:border-neutral-700/60">
               <th className="px-5 py-3 w-10">
                 <input
                   type="checkbox"
@@ -497,29 +560,29 @@ export default function ReservasPage() {
                     seleccionadas.size === reservasFiltradas.length
                   }
                   onChange={toggleSeleccionTodas}
-                  className="h-4 w-4 rounded border-neutral-300 accent-brand-primary"
+                  className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary"
                 />
               </th>
-              <th className="font-sans text-xs text-neutral-500 uppercase font-semibold px-2 py-3">ID</th>
-              <th className="font-sans text-xs text-neutral-500 uppercase font-semibold px-2 py-3">Cliente</th>
-              <th className="font-sans text-xs text-neutral-500 uppercase font-semibold px-2 py-3">Cancha</th>
-              <th className="font-sans text-xs text-neutral-500 uppercase font-semibold px-2 py-3">Fecha y Hora</th>
-              <th className="font-sans text-xs text-neutral-500 uppercase font-semibold px-2 py-3">Monto</th>
-              <th className="font-sans text-xs text-neutral-500 uppercase font-semibold px-2 py-3">Estado</th>
-              <th className="font-sans text-xs text-neutral-500 uppercase font-semibold px-2 py-3 text-right pr-5">Acciones</th>
+              <th className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold px-2 py-3">ID</th>
+              <th className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold px-2 py-3">Cliente</th>
+              <th className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold px-2 py-3">Cancha</th>
+              <th className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold px-2 py-3">Fecha y Hora</th>
+              <th className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold px-2 py-3">Monto</th>
+              <th className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold px-2 py-3">Estado</th>
+              <th className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold px-2 py-3 text-right pr-5">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={8} className="text-center py-8 font-sans text-sm text-neutral-400">
+                <td colSpan={8} className="text-center py-8 font-sans text-sm text-neutral-400 dark:text-neutral-500">
                   Cargando reservas...
                 </td>
               </tr>
             )}
             {!isLoading && reservasFiltradas.length === 0 && (
               <tr>
-                <td colSpan={8} className="text-center py-8 font-sans text-sm text-neutral-400">
+                <td colSpan={8} className="text-center py-8 font-sans text-sm text-neutral-400 dark:text-neutral-500">
                   No hay reservas que coincidan con los filtros.
                 </td>
               </tr>
@@ -533,10 +596,10 @@ export default function ReservasPage() {
                       type="checkbox"
                       checked={seleccionadas.has(r.id)}
                       onChange={() => toggleSeleccion(r.id)}
-                      className="h-4 w-4 rounded border-neutral-300 accent-brand-primary"
+                      className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary"
                     />
                   </td>
-                  <td className="px-2 py-4 font-sans text-sm font-semibold text-neutral-700">
+                  <td className="px-2 py-4 font-sans text-sm font-semibold text-neutral-700 dark:text-neutral-200">
                     #RES-{String(r.id).padStart(3, '0')}
                   </td>
                   <td className="px-2 py-4">
@@ -544,21 +607,30 @@ export default function ReservasPage() {
                       <span className="h-8 w-8 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-xs font-bold flex items-center justify-center shrink-0">
                         {iniciales(r.clienteNombre)}
                       </span>
-                      <span className="font-sans text-sm font-medium text-neutral-900">
+                      <span className="font-sans text-sm font-medium text-neutral-900 dark:text-neutral-50">
                         {r.clienteNombre}
                       </span>
                     </div>
                   </td>
-                  <td className="px-2 py-4 font-sans text-sm text-neutral-700">
+                  <td className="px-2 py-4 font-sans text-sm text-neutral-700 dark:text-neutral-200">
                     {r.canchaNombre}
                   </td>
                   <td className="px-2 py-4">
-                    <p className="font-sans text-sm text-neutral-700">{formatFecha(r.fecha)}</p>
-                    <p className="font-sans text-xs text-neutral-400">
+                    <p className="font-sans text-sm text-neutral-700 dark:text-neutral-200">{formatFecha(r.fecha)}</p>
+                    <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500">
                       {r.horaInicio} - {r.horaFin}
                     </p>
+                    {r.serieId && (
+                      <span
+                        title={r.serieEtiqueta}
+                        className="inline-flex items-center gap-1 mt-1 rounded-full bg-brand-secondary/15 text-brand-primary px-2 py-0.5 font-sans text-[10px] font-semibold"
+                      >
+                        <Repeat className="h-2.5 w-2.5" />
+                        {r.serieIndice ?? '?'}/{r.serieTotalFechas ?? '?'}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-2 py-4 font-sans text-sm font-semibold text-neutral-900">
+                  <td className="px-2 py-4 font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50">
                     S/ {r.montoTotal}
                   </td>
                   <td className="px-2 py-4">
@@ -571,16 +643,28 @@ export default function ReservasPage() {
                   </td>
                   <td className="px-2 py-4">
                     <div className="flex items-center justify-end gap-3 pr-3">
+                      {r.serieId && pendientesDeSerie(r.serieId) > 0 && (
+                        <button
+                          onClick={() => marcarSeriePagada(r.serieId as string)}
+                          disabled={marcandoSerie === r.serieId}
+                          aria-label="Marcar serie como pagada"
+                          title={`Marcar ${pendientesDeSerie(r.serieId)} fecha(s) pendiente(s) de la serie como pagadas`}
+                          className="text-neutral-400 dark:text-neutral-500 hover:text-success disabled:opacity-50"
+                        >
+                          <Landmark className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
+                        onClick={() => navigate(`/calendario/nueva-reserva/${r.id}/editar`)}
                         aria-label="Editar reserva"
-                        className="text-neutral-400 hover:text-brand-primary"
+                        className="text-neutral-400 dark:text-neutral-500 hover:text-brand-primary"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => eliminarReserva(r.id)}
                         aria-label="Eliminar reserva"
-                        className="text-neutral-400 hover:text-danger"
+                        className="text-neutral-400 dark:text-neutral-500 hover:text-danger"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

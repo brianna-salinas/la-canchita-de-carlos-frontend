@@ -11,6 +11,17 @@
       "nombre": "Cancha 2",
       "deporte": "voley",
       "precioHora": 60
+    },
+    {
+      "nombre": "Cancha 3",
+      "deporte": "Vóley",
+      "superficie": "",
+      "precioHora": 20,
+      "estado": "ACTIVA",
+      "habilitada": true,
+      "descripcion": "",
+      "fotoUrl": "",
+      "id": "rDAxFwUnpgY"
     }
   ],
   "clientes": [
@@ -24,12 +35,13 @@
       "id": "2",
       "nombre": "Ricardo Gómez",
       "telefono": "51987654322",
-      "dni": "dfgdg"
+      "dni": ""
     },
     {
-      "id": "3",
-      "nombre": "Ana Beltrán",
-      "telefono": "51987654323"
+      "nombre": "Brianna",
+      "telefono": "988392333",
+      "dni": "",
+      "id": "rOzdDoLtWLQ"
     }
   ],
   "alquileres": [

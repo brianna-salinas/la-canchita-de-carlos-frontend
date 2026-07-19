@@ -48,26 +48,39 @@ export function useSolicitudes() {
 export function useAprobarSolicitud() {
   const queryClient = useQueryClient()
   return async (solicitud: Solicitud) => {
-    await apiClient.patch(`/solicitudes/${solicitud.id}`, { estado: 'APROBADO' })
-    await apiClient.post('/usuarios', {
-      nombre: solicitud.nombre,
-      correo: solicitud.correo,
-      password: 'canchita123',
-      esDueno: false,
-      estado: 'ACTIVO',
-      ultimoAcceso: new Date().toISOString(),
-    })
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['solicitudes'] }),
-      queryClient.invalidateQueries({ queryKey: ['usuarios'] }),
-    ])
+    try {
+      // NOTA: son dos escrituras separadas contra json-server, sin
+      // transacción. Si la segunda falla, la solicitud queda marcada
+      // APROBADO sin que exista el usuario correspondiente. Aceptable
+      // en fase de fake API; el backend real (Sprint 2) debe hacer
+      // esto en una sola operación atómica.
+      await apiClient.patch(`/solicitudes/${solicitud.id}`, { estado: 'APROBADO' })
+      await apiClient.post('/usuarios', {
+        nombre: solicitud.nombre,
+        correo: solicitud.correo,
+        password: 'canchita123',
+        esDueno: false,
+        estado: 'ACTIVO',
+        ultimoAcceso: new Date().toISOString(),
+      })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['solicitudes'] }),
+        queryClient.invalidateQueries({ queryKey: ['usuarios'] }),
+      ])
+    } catch {
+      window.alert('No se pudo aprobar la solicitud. Intenta de nuevo.')
+    }
   }
 }
 
 export function useRechazarSolicitud() {
   const queryClient = useQueryClient()
   return async (id: number) => {
-    await apiClient.patch(`/solicitudes/${id}`, { estado: 'RECHAZADO' })
-    await queryClient.invalidateQueries({ queryKey: ['solicitudes'] })
+    try {
+      await apiClient.patch(`/solicitudes/${id}`, { estado: 'RECHAZADO' })
+      await queryClient.invalidateQueries({ queryKey: ['solicitudes'] })
+    } catch {
+      window.alert('No se pudo rechazar la solicitud. Intenta de nuevo.')
+    }
   }
 }

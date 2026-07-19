@@ -1,4 +1,10 @@
 @import "tailwindcss";
+
+/* Modo oscuro basado en una clase .dark en <html> (agregada/quitada
+   por useTheme), en vez de solo prefers-color-scheme. Así el botón
+   de la app manda, no únicamente la configuración del sistema. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-brand-primary: #2563EB;
   --color-brand-secondary: #7DD3FC;
@@ -13,6 +19,11 @@
 
 body {
   margin: 0;
+  transition: background-color 0.15s ease;
+}
+
+.dark body {
+  background-color: #0F172A;
 }
 /* Scrollbar personalizada con los colores de marca (Chrome/Edge/Safari) */
 ::-webkit-scrollbar {

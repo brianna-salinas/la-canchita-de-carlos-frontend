@@ -44,7 +44,7 @@ type CellState =
 function Cell({ estado }: { estado: CellState }) {
   if (estado.tipo === 'bloqueado') {
     return (
-      <div className="h-full min-h-[76px] rounded-lg bg-neutral-100 border border-neutral-200 flex flex-col items-center justify-center gap-1 text-neutral-400">
+      <div className="h-full min-h-[76px] rounded-lg bg-neutral-100 dark:bg-neutral-700/60 border border-neutral-200 dark:border-neutral-700 flex flex-col items-center justify-center gap-1 text-neutral-400 dark:text-neutral-500">
         <Lock className="h-4 w-4" />
         <span className="font-sans text-[11px] font-medium">BLOQUEADO</span>
       </div>
@@ -53,12 +53,12 @@ function Cell({ estado }: { estado: CellState }) {
 
   if (estado.tipo === 'libre') {
     return (
-      <div className="group h-full min-h-14 md:min-h-[76px] rounded-lg bg-neutral-50 md:bg-brand-secondary/10 border-0 md:border md:border-brand-secondary/40 p-2 flex items-center justify-center md:justify-between">
-        <span className="font-sans text-xs md:text-[11px] font-medium md:font-semibold text-neutral-400 md:text-brand-primary md:uppercase">
+      <div className="group h-full min-h-14 md:min-h-[76px] rounded-lg bg-neutral-50 dark:bg-neutral-900 md:bg-brand-secondary/10 border-0 md:border md:border-brand-secondary/40 p-2 flex items-center justify-center md:justify-between">
+        <span className="font-sans text-xs md:text-[11px] font-medium md:font-semibold text-neutral-400 dark:text-neutral-500 md:text-brand-primary md:uppercase">
           Libre
         </span>
         <button
-          className="hidden md:flex self-end h-6 w-6 rounded-full bg-white border border-brand-secondary/50 items-center justify-center text-brand-primary hover:bg-brand-secondary/10"
+          className="hidden md:flex self-end h-6 w-6 rounded-full bg-white dark:bg-neutral-800 border border-brand-secondary/50 items-center justify-center text-brand-primary hover:bg-brand-secondary/10"
           aria-label="Nueva reserva en este horario"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -91,10 +91,10 @@ function Cell({ estado }: { estado: CellState }) {
       }`}
     >
       <div className="min-w-0">
-        <p className="font-sans font-semibold text-xs text-neutral-900 leading-tight truncate">
+        <p className="font-sans font-semibold text-xs text-neutral-900 dark:text-neutral-50 leading-tight truncate">
           {reserva.clienteNombre}
         </p>
-        <p className="hidden md:block font-sans text-[11px] text-neutral-500 truncate">
+        <p className="hidden md:block font-sans text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
           {reserva.tipo ?? 'Reserva'} - {duracionHoras}hr
         </p>
       </div>
@@ -220,33 +220,33 @@ export default function CalendarioPage() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => cambiarDia(-1)}
-            className="h-9 w-9 rounded-lg border border-neutral-200 flex items-center justify-center text-neutral-500 hover:bg-neutral-100"
+            className="h-9 w-9 rounded-lg border border-neutral-200 dark:border-neutral-700 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100"
             aria-label="Día anterior"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button
             onClick={() => cambiarDia(1)}
-            className="h-9 w-9 rounded-lg border border-neutral-200 flex items-center justify-center text-neutral-500 hover:bg-neutral-100"
+            className="h-9 w-9 rounded-lg border border-neutral-200 dark:border-neutral-700 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100"
             aria-label="Día siguiente"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
 
-        <h1 className="font-sans font-bold text-xl md:text-2xl text-neutral-900">
+        <h1 className="font-sans font-bold text-xl md:text-2xl text-neutral-900 dark:text-neutral-50">
           {displayDate}
         </h1>
 
         <button
           onClick={irAHoy}
-          className="h-8 px-4 rounded-full border border-neutral-200 font-sans text-sm text-neutral-600 hover:bg-neutral-100"
+          className="h-8 px-4 rounded-full border border-neutral-200 dark:border-neutral-700 font-sans text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100"
         >
           Hoy
         </button>
 
         <div className="ml-auto flex items-center gap-3">
-          <div className="flex rounded-full bg-neutral-100 p-1">
+          <div className="flex rounded-full bg-neutral-100 dark:bg-neutral-700/60 p-1">
             {VISTAS.map((v) => (
               <button
                 key={v.value}
@@ -254,7 +254,7 @@ export default function CalendarioPage() {
                 className={`px-4 h-8 rounded-full font-sans text-sm font-medium transition-colors ${
                   vista === v.value
                     ? 'bg-brand-primary text-white'
-                    : 'text-neutral-500 hover:text-neutral-700'
+                    : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700'
                 }`}
               >
                 {v.label}
@@ -284,7 +284,7 @@ export default function CalendarioPage() {
           </button>
           <button onClick={irAHoy} className="text-center">
             <p className="font-sans font-bold text-white text-base">{displayDateCorta}</p>
-            <p className="font-sans text-xs text-neutral-400 mt-0.5">
+            <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
               {esHoy ? 'Hoy' : 'Ir a hoy'}
             </p>
           </button>
@@ -305,7 +305,7 @@ export default function CalendarioPage() {
               className={`flex-1 h-9 rounded-full font-sans text-sm font-medium transition-colors ${
                 vista === v.value
                   ? 'bg-brand-primary text-white'
-                  : 'text-neutral-500'
+                  : 'text-neutral-500 dark:text-neutral-400'
               }`}
             >
               {v.label}
@@ -315,8 +315,8 @@ export default function CalendarioPage() {
       </div>
 
       {vista !== 'dia' ? (
-        <div className="mt-6 bg-white rounded-2xl border border-neutral-200 p-10 text-center">
-          <p className="font-sans text-base text-neutral-500">
+        <div className="mt-6 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-10 text-center">
+          <p className="font-sans text-base text-neutral-500 dark:text-neutral-400">
             La vista de {vista === 'semana' ? 'semana' : 'mes'} todavía no está
             disponible. Por ahora usa la vista de Día.
           </p>
@@ -324,29 +324,29 @@ export default function CalendarioPage() {
       ) : (
         <>
           {/* Grilla del día */}
-          <div className="mt-6 bg-white rounded-2xl border border-neutral-200 overflow-x-auto">
+          <div className="mt-6 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 overflow-x-auto">
             <div style={{ minWidth: `${64 + canchas.length * 140}px` }}>
               <div
-                className="grid border-b border-neutral-100"
+                className="grid border-b border-neutral-100 dark:border-neutral-700/60"
                 style={{
                   gridTemplateColumns: `64px repeat(${canchas.length || 1}, minmax(140px, 1fr))`,
                 }}
               >
-                <div className="px-2 md:px-4 py-3 font-sans text-xs font-semibold text-neutral-500 uppercase">
+                <div className="px-2 md:px-4 py-3 font-sans text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase">
                   Hora
                 </div>
                 {canchas.map((c) => (
-                  <div key={c.id} className="px-2 md:px-4 py-3 text-center border-l border-neutral-100">
+                  <div key={c.id} className="px-2 md:px-4 py-3 text-center border-l border-neutral-100 dark:border-neutral-700/60">
                     <p className="font-sans font-semibold text-sm text-brand-primary">
                       {c.nombre}
                     </p>
-                    <p className="font-sans text-xs text-neutral-400">{c.superficie}</p>
+                    <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500">{c.superficie}</p>
                   </div>
                 ))}
               </div>
 
               {cargando && (
-                <p className="font-sans text-sm text-neutral-400 text-center py-8">
+                <p className="font-sans text-sm text-neutral-400 dark:text-neutral-500 text-center py-8">
                   Cargando calendario...
                 </p>
               )}
@@ -360,7 +360,7 @@ export default function CalendarioPage() {
                       gridTemplateColumns: `64px repeat(${canchas.length || 1}, minmax(140px, 1fr))`,
                     }}
                   >
-                    <div className="px-2 md:px-4 py-3 font-sans text-xs md:text-sm text-neutral-600 flex items-center">
+                    <div className="px-2 md:px-4 py-3 font-sans text-xs md:text-sm text-neutral-600 dark:text-neutral-300 flex items-center">
                       {hora}
                     </div>
                     {canchas.map((c) => (
@@ -374,8 +374,8 @@ export default function CalendarioPage() {
           </div>
 
           {/* Referencias */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 font-sans text-xs text-neutral-500">
-            <span className="font-semibold text-neutral-600">REFERENCIAS:</span>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 font-sans text-xs text-neutral-500 dark:text-neutral-400">
+            <span className="font-semibold text-neutral-600 dark:text-neutral-300">REFERENCIAS:</span>
             <span className="flex items-center gap-1.5">
               <span className="h-3.5 w-3.5 rounded bg-brand-secondary/20 border border-brand-secondary" />
               Libre
@@ -389,64 +389,64 @@ export default function CalendarioPage() {
               Ocupado (Debe)
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-3.5 w-3.5 rounded bg-neutral-200 border border-neutral-300" />
+              <span className="h-3.5 w-3.5 rounded bg-neutral-200 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600" />
               Mantenimiento / Bloqueado
             </span>
           </div>
 
           {/* Tarjetas de resumen del día */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-white rounded-2xl border border-neutral-200 p-4 flex items-center gap-3">
+            <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3">
               <span className="h-11 w-11 rounded-xl bg-brand-secondary/20 flex items-center justify-center shrink-0">
                 <CalendarCheck className="h-5 w-5 text-brand-primary" />
               </span>
               <div className="min-w-0">
-                <p className="font-sans text-xs text-neutral-500 uppercase tracking-wide">
+                <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
                   Disponibilidad
                 </p>
-                <p className="font-sans font-bold text-xl text-neutral-900">
+                <p className="font-sans font-bold text-xl text-neutral-900 dark:text-neutral-50">
                   {disponibilidad}%
                 </p>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-neutral-200 p-4 flex items-center gap-3">
+            <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3">
               <span className="h-11 w-11 rounded-xl bg-success/15 flex items-center justify-center shrink-0">
                 <Wallet className="h-5 w-5 text-success" />
               </span>
               <div className="min-w-0">
-                <p className="font-sans text-xs text-neutral-500 uppercase tracking-wide">
+                <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
                   Recaudación Hoy
                 </p>
-                <p className="font-sans font-bold text-xl text-neutral-900">
+                <p className="font-sans font-bold text-xl text-neutral-900 dark:text-neutral-50">
                   S/ {recaudacionHoy.toFixed(2)}
                 </p>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-neutral-200 p-4 flex items-center gap-3">
+            <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3">
               <span className="h-11 w-11 rounded-xl bg-danger/15 flex items-center justify-center shrink-0">
                 <CreditCard className="h-5 w-5 text-danger" />
               </span>
               <div className="min-w-0">
-                <p className="font-sans text-xs text-neutral-500 uppercase tracking-wide">
+                <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
                   Pagos Pendientes
                 </p>
-                <p className="font-sans font-bold text-xl text-neutral-900">
+                <p className="font-sans font-bold text-xl text-neutral-900 dark:text-neutral-50">
                   S/ {pagosPendientes.toFixed(2)}
                 </p>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-neutral-200 p-4 flex items-center gap-3">
+            <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3">
               <span className="h-11 w-11 rounded-xl bg-brand-secondary/20 flex items-center justify-center shrink-0">
                 <TrendingUp className="h-5 w-5 text-brand-primary" />
               </span>
               <div className="min-w-0">
-                <p className="font-sans text-xs text-neutral-500 uppercase tracking-wide">
+                <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
                   Ocupación Pico
                 </p>
-                <p className="font-sans font-bold text-xl text-neutral-900">
+                <p className="font-sans font-bold text-xl text-neutral-900 dark:text-neutral-50">
                   {ocupacionPico}
                 </p>
               </div>
@@ -454,13 +454,13 @@ export default function CalendarioPage() {
           </div>
 
           {/* Acciones inferiores (solo mobile) */}
-          <p className="md:hidden text-center font-sans text-xs text-neutral-400 mt-8">
+          <p className="md:hidden text-center font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-8">
             Desarrollado por Brianna Salinas | 2026
           </p>
           <div className="md:hidden flex gap-3 mt-4">
             <button
               onClick={() => navigate('/reservas')}
-              className="flex-1 h-12 rounded-full border border-neutral-200 bg-white font-sans font-semibold text-sm text-neutral-700 flex items-center justify-center gap-2 hover:bg-neutral-50"
+              className="flex-1 h-12 rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 font-sans font-semibold text-sm text-neutral-700 dark:text-neutral-200 flex items-center justify-center gap-2 hover:bg-neutral-50"
             >
               <CalendarCheck className="h-4 w-4" />
               Ver todas
