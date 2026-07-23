@@ -18,13 +18,15 @@ import { useAuth } from '../../auth/useAuth'
 import { useSolicitudes, useAprobarSolicitud, useRechazarSolicitud } from '../hooks/useSolicitudes'
 import { apiClient } from '../../shared/api/client'
 import { iniciales } from '../../shared/utils/format'
+import { getApiErrorMessage } from '../../shared/utils/api-error'
+import { esCorreoValido } from '../../shared/utils/validation'
 
 type Modo = null | 'perfil' | 'usuario' | 'correo' | 'password'
 
 export default function AjustesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user, logout, updateUser, verifyPassword } = useAuth()
+  const { user, logout, updateUser } = useAuth()
   const { data: solicitudes = [] } = useSolicitudes()
   const aprobar = useAprobarSolicitud()
   const rechazar = useRechazarSolicitud()
@@ -62,16 +64,22 @@ export default function AjustesPage() {
       setError('Completa todos los campos.')
       return
     }
+    if (!esCorreoValido(formPerfil.correo)) {
+      setError('El correo no tiene un formato válido.')
+      return
+    }
     setError('')
     setGuardando(true)
     try {
-      // Se reemplaza por PATCH /api/users/me cuando el backend esté
-      // conectado (Sprint 2). Por ahora apunta al fake API.
-      await apiClient.patch(`/usuarios/${user.id}`, {
-        nombre: formPerfil.nombre.trim(),
-        nombreUsuario: formPerfil.nombreUsuario.trim(),
-        correo: formPerfil.correo.trim(),
-      })
+      if (formPerfil.nombre.trim() !== nombre || formPerfil.nombreUsuario.trim() !== nombreUsuario) {
+        await apiClient.patch('/users/me/perfil', {
+          name: formPerfil.nombre.trim(),
+          username: formPerfil.nombreUsuario.trim(),
+        })
+      }
+      if (formPerfil.correo.trim() !== correo) {
+        await apiClient.patch('/users/me/correo', { email: formPerfil.correo.trim() })
+      }
       updateUser({
         nombre: formPerfil.nombre.trim(),
         nombreUsuario: formPerfil.nombreUsuario.trim(),
@@ -79,8 +87,8 @@ export default function AjustesPage() {
       })
       await queryClient.invalidateQueries({ queryKey: ['usuarios'] })
       setModo(null)
-    } catch {
-      setError('No se pudo guardar. Intenta de nuevo.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'No se pudo guardar. Intenta de nuevo.'))
     } finally {
       setGuardando(false)
     }
@@ -92,6 +100,10 @@ export default function AjustesPage() {
       setError('Completa todos los campos.')
       return
     }
+    if (formPassword.nueva.length < 8) {
+      setError('La nueva contraseña debe tener al menos 8 caracteres.')
+      return
+    }
     if (formPassword.nueva !== formPassword.confirmar) {
       setError('La nueva contraseña y su confirmación no coinciden.')
       return
@@ -99,15 +111,13 @@ export default function AjustesPage() {
     setError('')
     setGuardando(true)
     try {
-      const esValida = await verifyPassword(formPassword.actual)
-      if (!esValida) {
-        setError('La contraseña actual es incorrecta.')
-        return
-      }
-      await apiClient.patch(`/usuarios/${user.id}`, { password: formPassword.nueva })
+      await apiClient.patch('/users/me/contrasena', {
+        currentPassword: formPassword.actual,
+        newPassword: formPassword.nueva,
+      })
       setModo(null)
-    } catch {
-      setError('No se pudo cambiar la contraseña. Intenta de nuevo.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'La contraseña actual es incorrecta o no se pudo cambiar. Intenta de nuevo.'))
     } finally {
       setGuardando(false)
     }
@@ -115,26 +125,31 @@ export default function AjustesPage() {
 
   function subirFoto(archivo: File | undefined) {
     if (!archivo || !user) return
-    const reader = new FileReader()
-    reader.onload = async () => {
-      const fotoUrl = String(reader.result)
-      setSubiendoFoto(true)
-      try {
-        await apiClient.patch(`/usuarios/${user.id}`, { fotoUrl })
-        updateUser({ fotoUrl })
-        await queryClient.invalidateQueries({ queryKey: ['usuarios'] })
-      } finally {
-        setSubiendoFoto(false)
-      }
-    }
-    reader.readAsDataURL(archivo)
+    setSubiendoFoto(true)
+    const formData = new FormData()
+    formData.append('foto', archivo)
+    apiClient
+      .post(`/users/${user.id}/foto`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      .then(({ data }) => {
+        updateUser({ fotoUrl: data.photoUrl ?? undefined })
+        return queryClient.invalidateQueries({ queryKey: ['usuarios'] })
+      })
+      .catch((err) => {
+        window.alert(getApiErrorMessage(err, 'No se pudo subir la foto. Intenta de nuevo.'))
+      })
+      .finally(() => setSubiendoFoto(false))
   }
 
   async function eliminarCuenta() {
     if (!user || confirmarEliminar !== 'ELIMINAR') return
-    await apiClient.delete(`/usuarios/${user.id}`)
-    logout()
-    navigate('/login', { replace: true })
+    try {
+      await apiClient.delete('/users/me')
+      setEliminarModalAbierto(false)
+      logout()
+      navigate('/login', { replace: true })
+    } catch (err) {
+      window.alert(getApiErrorMessage(err, 'No se pudo eliminar la cuenta. Intenta de nuevo.'))
+    }
   }
 
   const tituloModal =
@@ -237,21 +252,27 @@ export default function AjustesPage() {
             </span>
             <ChevronRight className="h-4 w-4 text-neutral-300 shrink-0" />
           </button>
-          <button
-            onClick={() => navigate('/ajustes/solicitudes')}
-            className="w-full bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3"
-          >
-            <UserPlus className="h-5 w-5 text-brand-primary shrink-0" />
-            <span className="flex-1 min-w-0 text-left font-sans text-sm font-medium text-neutral-800 dark:text-neutral-100">
-              Solicitudes de acceso
-            </span>
-            {pendientes.length > 0 && (
-              <span className="shrink-0 h-5 min-w-[20px] px-1.5 rounded-full bg-danger text-white font-sans text-[11px] font-bold flex items-center justify-center">
-                {pendientes.length}
+          {/* Solo el dueño (Carlos) administra accesos: aprobar/rechazar
+              solicitudes es una accion que el backend ya protege con
+              requireOwner, pero antes el boton se mostraba a cualquier
+              administrador y les daba un 403 al tocarlo. */}
+          {user?.esDueno && (
+            <button
+              onClick={() => navigate('/ajustes/solicitudes')}
+              className="w-full bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3"
+            >
+              <UserPlus className="h-5 w-5 text-brand-primary shrink-0" />
+              <span className="flex-1 min-w-0 text-left font-sans text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                Solicitudes de acceso
               </span>
-            )}
-            <ChevronRight className="h-4 w-4 text-neutral-300 shrink-0" />
-          </button>
+              {pendientes.length > 0 && (
+                <span className="shrink-0 h-5 min-w-[20px] px-1.5 rounded-full bg-danger text-white font-sans text-[11px] font-bold flex items-center justify-center">
+                  {pendientes.length}
+                </span>
+              )}
+              <ChevronRight className="h-4 w-4 text-neutral-300 shrink-0" />
+            </button>
+          )}
         </div>
 
         <div className="bg-danger/5 border border-danger/20 rounded-2xl mt-6 p-4">
@@ -376,7 +397,11 @@ export default function AjustesPage() {
         </div>
       </div>
 
-      {/* Administración (desktop) */}
+      {/* Administración (desktop) — solo el dueño (Carlos) ve esto. Antes
+          se mostraba a cualquier administrador aunque el backend ya
+          bloquea GET/PATCH de solicitudes con requireOwner, asi que un
+          admin no-dueño solo se topaba con un 403 al entrar. */}
+      {user?.esDueno && (
       <div className="hidden md:block bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 mt-5">
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 dark:border-neutral-700/60">
           <div className="flex items-center gap-2">
@@ -435,6 +460,7 @@ export default function AjustesPage() {
           )}
         </div>
       </div>
+      )}
 
       {/* Zona de Peligro */}
       <div className="hidden md:flex bg-danger/5 border border-danger/20 rounded-2xl mt-5 p-6 flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

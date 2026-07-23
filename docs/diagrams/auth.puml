@@ -1,0 +1,69 @@
+@startuml auth-module
+title Módulo: Auth (frontend)
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "auth" {
+  interface AuthUser {
+    +id: string
+    +nombre: string
+    +correo: string
+    +esDueno: boolean
+    +fotoUrl?: string
+    +nombreUsuario?: string
+  }
+
+  interface AuthContextValue {
+    +user: AuthUser | null
+    +login(usuario, password): Promise<void>
+    +logout(): void
+    +updateUser(cambios): void
+    +verifyPassword(password): Promise<boolean>
+  }
+
+  class "AuthProvider" as AuthProvider << (F,orchid) componente >> {
+    -user: AuthUser | null
+    +login(usuario, password)
+    +logout()
+    +updateUser(cambios)
+    +verifyPassword(password)
+  }
+
+  class "useAuth" as useAuth << (F,orchid) hook >> {
+    +() : AuthContextValue
+  }
+
+  interface RequestAccessPayload {
+    +nombre: string
+    +correo: string
+    +telefono: string
+    +password: string
+  }
+
+  class "requestAccess" as requestAccess << (F,orchid) función >> {
+    +(payload: RequestAccessPayload): Promise
+  }
+
+  AuthProvider ..> AuthUser : gestiona
+  AuthProvider ..|> AuthContextValue : provee
+  useAuth ..> AuthContextValue : consume
+  requestAccess ..> RequestAccessPayload : usa
+}
+
+package "shared.api" {
+  class apiClient << (O,#4DBECC) axios instance >>
+}
+
+AuthProvider --> apiClient : usa
+requestAccess --> apiClient : usa
+
+note bottom of AuthProvider
+  Fase de fake API (Sprint 1): valida contra
+  json-server (db.json) y persiste la sesión
+  en localStorage. Se reemplaza por JWT +
+  POST /api/auth/login del backend real
+  en Sprint 2.
+end note
+
+@enduml

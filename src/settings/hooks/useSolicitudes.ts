@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../shared/api/client'
+import { getApiErrorMessage } from '../../shared/utils/api-error'
 
 export interface Solicitud {
   id: number
@@ -10,14 +11,12 @@ export interface Solicitud {
   estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'
 }
 
-// "12 Oct 2023" para desktop.
 export function formatFechaLarga(iso: string) {
   return new Date(iso)
     .toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
     .replace('.', '')
 }
 
-// "Hoy, 10:45 AM" / "Ayer, 18:20 PM" / "12 oct 2023" para mobile.
 export function formatFechaRelativa(iso: string) {
   const fecha = new Date(iso)
   const hora = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true })
@@ -32,15 +31,27 @@ export function formatFechaRelativa(iso: string) {
   return formatFechaLarga(iso)
 }
 
-// Solicitudes de acceso de nuevos administradores/personal. Se
-// reemplaza por GET /api/access-requests cuando el backend esté
-// conectado (Sprint 2). Por ahora apunta al fake API.
+interface SolicitudApiRow {
+  id: number
+  name: string
+  email: string
+  createdAt: string
+}
+
 export function useSolicitudes() {
   return useQuery({
     queryKey: ['solicitudes'],
     queryFn: async () => {
-      const { data } = await apiClient.get<Solicitud[]>('/solicitudes')
-      return data
+      const { data } = await apiClient.get('/users/solicitudes')
+      return (data as SolicitudApiRow[]).map(
+        (row): Solicitud => ({
+          id: row.id,
+          nombre: row.name,
+          correo: row.email,
+          creadoEn: row.createdAt,
+          estado: 'PENDIENTE',
+        }),
+      )
     },
   })
 }
@@ -49,26 +60,14 @@ export function useAprobarSolicitud() {
   const queryClient = useQueryClient()
   return async (solicitud: Solicitud) => {
     try {
-      // NOTA: son dos escrituras separadas contra json-server, sin
-      // transacción. Si la segunda falla, la solicitud queda marcada
-      // APROBADO sin que exista el usuario correspondiente. Aceptable
-      // en fase de fake API; el backend real (Sprint 2) debe hacer
-      // esto en una sola operación atómica.
-      await apiClient.patch(`/solicitudes/${solicitud.id}`, { estado: 'APROBADO' })
-      await apiClient.post('/usuarios', {
-        nombre: solicitud.nombre,
-        correo: solicitud.correo,
-        password: 'canchita123',
-        esDueno: false,
-        estado: 'ACTIVO',
-        ultimoAcceso: new Date().toISOString(),
-      })
+
+      await apiClient.patch(`/users/solicitudes/${solicitud.id}/autorizar`)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['solicitudes'] }),
         queryClient.invalidateQueries({ queryKey: ['usuarios'] }),
       ])
-    } catch {
-      window.alert('No se pudo aprobar la solicitud. Intenta de nuevo.')
+    } catch (err) {
+      window.alert(getApiErrorMessage(err, 'No se pudo aprobar la solicitud. Intenta de nuevo.'))
     }
   }
 }
@@ -77,10 +76,10 @@ export function useRechazarSolicitud() {
   const queryClient = useQueryClient()
   return async (id: number) => {
     try {
-      await apiClient.patch(`/solicitudes/${id}`, { estado: 'RECHAZADO' })
+      await apiClient.patch(`/users/solicitudes/${id}/rechazar`)
       await queryClient.invalidateQueries({ queryKey: ['solicitudes'] })
-    } catch {
-      window.alert('No se pudo rechazar la solicitud. Intenta de nuevo.')
+    } catch (err) {
+      window.alert(getApiErrorMessage(err, 'No se pudo rechazar la solicitud. Intenta de nuevo.'))
     }
   }
 }

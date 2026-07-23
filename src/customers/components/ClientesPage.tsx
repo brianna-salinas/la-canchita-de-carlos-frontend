@@ -20,22 +20,19 @@ import { useClientes, type Cliente } from '../hooks/useClientes'
 import { useReservas } from '../../bookings/hooks/useCalendario'
 import { apiClient } from '../../shared/api/client'
 import { iniciales } from '../../shared/utils/format'
+import { getApiErrorMessage } from '../../shared/utils/api-error'
+import { esTelefonoValido } from '../../shared/utils/validation'
 
 const PAGE_SIZE = 10
-// Un cliente se considera VIP a partir de este número de alquileres
-// registrados. Ajustable cuando el negocio defina el criterio real.
 const UMBRAL_VIP = 10
 
-// Formato DD/MM/AAAA, distinto del "11 jul 2026" que usan
-// Reservas/Solicitudes — por eso no vive en shared/utils/format.
 function formatFecha(fecha: string) {
   const d = new Date(`${fecha}T00:00:00`)
   return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function formatTelefono(telefono: string) {
-  // Los números en db.json vienen como "51987654321" (sin +).
-  // Los mostramos con formato "+51 987 654 321" cuando aplica.
+
   const solo = telefono.replace(/\D/g, '')
   if (solo.length === 11 && solo.startsWith('51')) {
     return `+51 ${solo.slice(2, 5)} ${solo.slice(5, 8)} ${solo.slice(8)}`
@@ -69,10 +66,8 @@ export default function ClientesPage() {
   const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null)
   const [form, setForm] = useState<FormState>(FORM_VACIO)
   const [guardando, setGuardando] = useState(false)
+  const [errorModal, setErrorModal] = useState<string | null>(null)
 
-  // Cruza clientes con sus alquileres reales (mismo dataset que
-  // Reservas/Calendario, queryKey ['alquileres']) para calcular el
-  // conteo y la fecha del último alquiler sin datos hardcodeados.
   const clientesConStats: ClienteConStats[] = useMemo(() => {
     return clientes.map((c) => {
       const propios = reservas.filter((r) => r.clienteId === c.id)
@@ -112,28 +107,44 @@ export default function ClientesPage() {
   function abrirNuevo() {
     setClienteEditando(null)
     setForm(FORM_VACIO)
+    setErrorModal(null)
     setModalAbierto(true)
   }
 
   function abrirEditar(c: Cliente) {
     setClienteEditando(c)
     setForm({ nombre: c.nombre, telefono: c.telefono, dni: c.dni ?? '' })
+    setErrorModal(null)
     setModalAbierto(true)
   }
 
   async function guardarCliente() {
-    if (!form.nombre.trim() || !form.telefono.trim()) return
+    if (!form.nombre.trim()) {
+      setErrorModal('El nombre no puede estar vacío.')
+      return
+    }
+    if (!form.telefono.trim()) {
+      setErrorModal('El teléfono no puede estar vacío.')
+      return
+    }
+    if (!esTelefonoValido(form.telefono)) {
+      setErrorModal('El teléfono no es válido (debe ser un celular peruano de 9 dígitos).')
+      return
+    }
+    setErrorModal(null)
     setGuardando(true)
     try {
-      // Se reemplaza por POST/PATCH /api/customers (RF09) cuando el
-      // backend esté conectado (Sprint 2). Por ahora apunta al fake API.
+      // POST/PATCH /customers (RF09) contra el backend real.
+      const payload = { name: form.nombre.trim(), phone: form.telefono.trim(), documentNumber: form.dni.trim() || undefined }
       if (clienteEditando) {
-        await apiClient.patch(`/clientes/${clienteEditando.id}`, form)
+        await apiClient.patch(`/customers/${clienteEditando.id}`, payload)
       } else {
-        await apiClient.post('/clientes', form)
+        await apiClient.post('/customers', payload)
       }
       await queryClient.invalidateQueries({ queryKey: ['clientes'] })
       setModalAbierto(false)
+    } catch (err) {
+      setErrorModal(getApiErrorMessage(err, 'No se pudo guardar el cliente. Intenta de nuevo.'))
     } finally {
       setGuardando(false)
     }
@@ -142,10 +153,10 @@ export default function ClientesPage() {
   async function eliminarCliente(id: number) {
     if (!window.confirm('¿Eliminar este cliente? Esta acción no se puede deshacer.')) return
     try {
-      await apiClient.delete(`/clientes/${id}`)
+      await apiClient.delete(`/customers/${id}`)
       await queryClient.invalidateQueries({ queryKey: ['clientes'] })
-    } catch {
-      window.alert('No se pudo eliminar el cliente. Intenta de nuevo.')
+    } catch (err) {
+      window.alert(getApiErrorMessage(err, 'No se pudo eliminar el cliente. Intenta de nuevo.'))
     }
   }
 
@@ -154,7 +165,11 @@ export default function ClientesPage() {
   }
 
   return (
-    <AppShell searchPlaceholder="Buscar clientes por nombre, DNI o teléfono...">
+    <AppShell
+      searchPlaceholder="Buscar clientes por nombre, DNI o teléfono..."
+      searchValue={busqueda}
+      onSearchChange={setBusqueda}
+    >
       {/* ================= DESKTOP ================= */}
       <div className="hidden md:flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -176,8 +191,8 @@ export default function ClientesPage() {
 
       {isError && (
         <p className="hidden md:block font-sans text-sm text-danger mt-4">
-          No se pudieron cargar los clientes. Verifica que el fake API
-          (json-server) esté corriendo en el puerto 3001.
+          No se pudieron cargar los clientes. Verifica tu conexión o que el
+          servidor esté disponible.
         </p>
       )}
 
@@ -375,8 +390,8 @@ export default function ClientesPage() {
 
         {isError && (
           <p className="font-sans text-sm text-danger mt-4">
-            No se pudieron cargar los clientes. Verifica que el fake API
-            (json-server) esté corriendo en el puerto 3001.
+            No se pudieron cargar los clientes. Verifica tu conexión o que el
+            servidor esté disponible.
           </p>
         )}
         {isLoading && (
@@ -518,6 +533,12 @@ export default function ClientesPage() {
                 />
               </div>
             </div>
+
+            {errorModal && (
+              <p className="font-sans text-sm text-danger mt-3" role="alert">
+                {errorModal}
+              </p>
+            )}
 
             <div className="flex gap-3 mt-6">
               <button

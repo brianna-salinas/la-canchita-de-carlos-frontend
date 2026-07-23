@@ -2,13 +2,8 @@ import { type ReactNode } from 'react'
 import ThemeToggle from '../../shared/components/ThemeToggle'
 
 interface AuthLayoutProps {
-  /** Contenido del panel izquierdo (imagen o gradiente de marca) */
   left: ReactNode
-  /** Contenido del panel derecho (formulario) */
   children: ReactNode
-  /** Fondo del panel derecho. Por defecto blanco; Login usa gris claro
-   * en mobile (para que la tarjeta del formulario resalte, como en el
-   * mockup) y blanco en desktop. */
   rightBgClassName?: string
 }
 

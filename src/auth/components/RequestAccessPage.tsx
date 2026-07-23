@@ -11,9 +11,9 @@ import {
   ArrowLeft,
 } from 'lucide-react'
 import AuthLayout, { AuthFooter } from './AuthLayout'
-// Reemplazar por la llamada real al endpoint de solicitud (US20 / TS05)
-// cuando el backend esté conectado (Sprint 2). Por ahora apunta al fake API.
 import { requestAccess } from './../api.ts'
+import { getApiErrorMessage } from '../../shared/utils/api-error'
+import { esCorreoValido, esTelefonoValido } from '../../shared/utils/validation'
 
 export default function RequestAccessPage() {
   const navigate = useNavigate()
@@ -28,14 +28,33 @@ export default function RequestAccessPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+
+    if (!nombre.trim()) {
+      setError('El nombre no puede estar vacío.')
+      return
+    }
+    if (!esCorreoValido(correo)) {
+      setError('El correo no tiene un formato válido.')
+      return
+    }
+    if (!esTelefonoValido(telefono)) {
+      setError('El teléfono no es válido (debe ser un celular peruano de 9 dígitos).')
+      return
+    }
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres.')
+      return
+    }
+
     setLoading(true)
     try {
       // US20, Escenario 1: solicitud creada en estado pendiente
       await requestAccess({ nombre, correo, telefono, password })
       navigate('/solicitud-enviada')
-    } catch {
-      // US20, Escenario 2: correo ya registrado
-      setError('Ese correo ya tiene una cuenta o una solicitud pendiente.')
+    } catch (err) {
+      // US20, Escenario 2: correo ya registrado (o cualquier otro rechazo
+      // del backend, mostrando su mensaje real en vez de uno genérico).
+      setError(getApiErrorMessage(err, 'No se pudo enviar la solicitud. Intenta de nuevo.'))
     } finally {
       setLoading(false)
     }

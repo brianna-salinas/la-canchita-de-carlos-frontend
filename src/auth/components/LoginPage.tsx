@@ -2,8 +2,6 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { User, Lock, Eye, EyeOff } from 'lucide-react'
 import AuthLayout, { AuthFooter } from './AuthLayout'
-// Reemplazar por el hook real de autenticación (US01) cuando el
-// backend esté conectado (Sprint 2). Por ahora apunta al fake API.
 import { useAuth } from './../useAuth'
 
 export default function LoginPage() {

@@ -1,16 +1,19 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
-import { apiClient } from "../shared/api/client";
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { apiClient, setToken, getToken } from "../shared/api/client";
+
+// La signed URL de la foto de perfil (bucket privado en Supabase) vence a la
+// hora. Antes solo se obtenia una vez (login o al subirla) y quedaba fija en
+// localStorage, asi que pasada la hora la foto "desaparecia sola" del navbar
+// aunque siguiera en el bucket. Se renueva pidiendo /users/me bastante antes
+// de que venza.
+const INTERVALO_REFRESCO_FOTO_MS = 45 * 60 * 1000;
 
 export interface AuthUser {
-  id: string;
+  id: number;
   nombre: string;
   correo: string;
   esDueno: boolean;
-  /** URL de foto de perfil. Si no existe, la UI muestra un ícono
-   * genérico de usuario en su lugar. */
   fotoUrl?: string;
-  /** Nombre de usuario mostrado en Ajustes. Si el registro de
-   * db.json no lo trae, se deriva del correo (antes del @). */
   nombreUsuario?: string;
 }
 
@@ -18,14 +21,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   login: (usuario: string, password: string) => Promise<void>;
   logout: () => void;
-  /** Aplica cambios parciales al usuario logueado en memoria y en
-   * localStorage (no pega al fake API por sí sola; eso lo hace quien
-   * llama, ej. AjustesPage, antes de invocar esto). */
   updateUser: (cambios: Partial<AuthUser>) => void;
-  /** Verifica la contraseña actual contra el registro real en el
-   * fake API, sin persistir nada. Se reemplaza por un endpoint real
-   * de verificación cuando el backend esté conectado (Sprint 2). */
-  verifyPassword: (password: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -51,35 +47,33 @@ function guardarUsuario(user: AuthUser | null) {
   }
 }
 
-/**
- * Fase de fake API (Sprint 1): valida contra json-server buscando un
- * usuario por correo/usuario y comparando la contraseña en texto plano
- * (db.json). La sesión se guarda en localStorage para sobrevivir
- * recargas de página, igual que un JWT persistido lo haría en el
- * backend real. Se reemplaza por el endpoint real POST /api/auth/login
- * (TS02) en el Sprint 2, con hash bcrypt y JWT en el backend.
- */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => leerUsuarioGuardado());
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    if (!getToken()) return null;
+    return leerUsuarioGuardado();
+  });
 
   async function login(usuario: string, password: string) {
-    const { data } = await apiClient.get("/usuarios", {
-      params: { correo: usuario },
+    const { data } = await apiClient.post("/auth/login", {
+      usernameOrEmail: usuario,
+      password,
     });
 
-    const found = data[0];
-    if (!found || found.password !== password) {
-      // US01, Escenario 2: credenciales inválidas rechazadas
-      throw new Error("Credenciales inválidas");
-    }
+    setToken(data.accessToken);
 
     const nuevoUsuario: AuthUser = {
-      id: found.id,
-      nombre: found.nombre,
-      correo: found.correo,
-      esDueno: !!found.esDueno,
-      fotoUrl: found.fotoUrl,
-      nombreUsuario: found.nombreUsuario ?? found.correo.split('@')[0],
+      id: data.user.id,
+      nombre: data.user.name,
+      correo: data.user.email,
+      esDueno: !!data.user.isOwner,
+      // Antes se derivaba del correo (data.user.email.split('@')[0]) porque
+      // el backend nunca mandaba el username real; ya lo manda, así que se
+      // usa directamente.
+      nombreUsuario: data.user.username,
+      // Antes el login nunca devolvia la foto de perfil, asi que tras cada
+      // inicio de sesion se perdia (solo quedaba si ya estaba en localStorage
+      // de una sesion anterior). Ahora el backend la resuelve a signed URL.
+      fotoUrl: data.user.photoUrl ?? undefined,
     };
 
     setUser(nuevoUsuario);
@@ -87,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    void apiClient.post("/auth/logout").catch(() => {});
+    setToken(null);
     setUser(null);
     guardarUsuario(null);
   }
@@ -100,19 +96,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }
 
-  async function verifyPassword(password: string) {
-    if (!user) return false;
-    const { data } = await apiClient.get(`/usuarios/${user.id}`);
-    return data?.password === password;
-  }
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelado = false;
+    async function refrescarFoto() {
+      try {
+        const { data } = await apiClient.get("/users/me");
+        if (!cancelado) updateUser({ fotoUrl: data.photoUrl ?? undefined });
+      } catch {
+        // Si falla (sin red, sesion vencida, etc.) se deja la foto como
+        // estaba; el proximo intento programado lo vuelve a resolver.
+      }
+    }
+
+    refrescarFoto();
+    const id = setInterval(refrescarFoto, INTERVALO_REFRESCO_FOTO_MS);
+    return () => {
+      cancelado = true;
+      clearInterval(id);
+    };
+    // Solo se re-arma el intervalo cuando cambia de usuario (login/logout),
+    // no en cada cambio de `user` (evitaria un loop, ya que refrescarFoto
+    // tambien actualiza `user`).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser, verifyPassword }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
   {children}
   </AuthContext.Provider>
 );
 }
 
+// Hook ubicado a propósito junto a su Provider (patrón estándar de React
+// Context); no es un componente, pero exportarlo desde aquí es intencional.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");

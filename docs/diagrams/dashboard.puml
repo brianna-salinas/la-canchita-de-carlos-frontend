@@ -1,0 +1,71 @@
+@startuml dashboard-module
+title Módulo: Dashboard (Panel)
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "dashboard" {
+  interface Alquiler {
+    +id: number
+    +canchaId: number
+    +canchaNombre: string
+    +clienteId: number | null
+    +clienteNombre: string
+    +tipo?: string
+    +fecha: string
+    +horaInicio: string
+    +horaFin: string
+    +estado: string
+    +estadoPago: "PAGADO" | "PARCIAL" | "PENDIENTE"
+    +montoTotal: number
+    +montoPagado: number
+    +tipoReserva?: "UNICA" | "MULTIDIA" | "RECURRENTE"
+    +serieId?: string
+    +serieModoPago?: "INDIVIDUAL" | "ACUMULADO"
+    +serieEtiqueta?: string
+    +serieTotalFechas?: number
+    +serieIndice?: number
+  }
+
+  class "useAlquileresHoy" as useAlquileresHoy << (F,orchid) hook >> {
+    +() : UseQueryResult<Alquiler[]>
+  }
+
+  class "calcularResumen" as calcularResumen << (F,orchid) función >> {
+    +(alquileres: Alquiler[]) : Resumen
+  }
+
+  class Resumen << (S,#EEDD82) resultado >> {
+    +totalAlquileres: number
+    +ingresoHoy: number
+    +montoPendiente: number
+    +cantidadPendientes: number
+  }
+
+  useAlquileresHoy ..> Alquiler : trae
+  calcularResumen ..> Alquiler : consume
+  calcularResumen ..> Resumen : produce
+}
+
+package "componentes (pantallas)" {
+  class PanelPage << (P,#F08080) página >>
+  PanelPage ..> useAlquileresHoy
+  PanelPage ..> calcularResumen
+}
+
+note bottom of Alquiler
+  Alquiler es el tipo "fuente" (definido aquí en
+  dashboard) reutilizado por el módulo bookings
+  (useReservas), para no duplicar la forma del
+  dato de reserva en dos lugares distintos.
+end note
+
+note bottom of useAlquileresHoy
+  Fase de fake API (Sprint 1): mismo queryKey
+  ("alquileres") que useReservas de bookings a
+  propósito — Panel y Calendario muestran el
+  mismo dataset, no dos copias. Se reemplaza por
+  GET /api/bookings?fecha=hoy en Sprint 2.
+end note
+
+@enduml

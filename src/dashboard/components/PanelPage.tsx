@@ -14,8 +14,20 @@ import {
 import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import AppShell from '../../shared/components/AppShell'
-import { useAlquileresHoy, calcularResumen } from '../hooks/usePanelData'
+import {
+  useAlquileresHoy,
+  calcularResumen,
+  fraseDelDia,
+  calcularSiguienteHorarioLibre,
+  calcularOcupacionSemanal,
+  type OcupacionDia,
+  type ProximaLibre,
+} from '../hooks/usePanelData'
+import { useCanchas, useReservas, useBloqueos, type Bloqueo } from '../../bookings/hooks/useCalendario'
+import { useAuth } from '../../auth/useAuth'
 import { apiClient } from '../../shared/api/client'
+import { getApiErrorMessage } from '../../shared/utils/api-error'
+import { toISODate, hourToNum } from '../../shared/utils/date'
 
 const ESTADO_LABEL: Record<string, string> = {
   PAGADO: 'Pagado',
@@ -37,9 +49,144 @@ const ESTADO_BORDER: Record<string, string> = {
 
 const DIAS_SEMANA = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
+// Declarados fuera del componente (no dentro del render de PanelPage) para
+// que React no los recree en cada render — si no, pierden su estado interno
+// en cada re-render del padre (react-hooks/static-components).
+function SiguienteHorarioCard({
+  proximaLibre,
+  onReservar,
+}: {
+  proximaLibre: ProximaLibre | null
+  onReservar: (proximaLibre: ProximaLibre) => void
+}) {
+  return (
+    <div className="bg-brand-primary rounded-2xl p-5 text-white">
+      <div className="flex items-center justify-between gap-4 md:block">
+        <div>
+          <p className="font-sans text-xs tracking-wide uppercase text-white/70">
+            Siguiente Horario Libre
+          </p>
+          <p className="font-sans font-bold text-2xl md:text-3xl mt-1">
+            {proximaLibre ? proximaLibre.horaInicio : '—'}
+            {proximaLibre && (
+              <span className="md:hidden"> - {proximaLibre.canchaNombre}</span>
+            )}
+          </p>
+          <p className="hidden md:block font-sans text-sm text-white/80 mt-1">
+            {proximaLibre ? proximaLibre.canchaNombre : 'Sin horarios libres hoy'}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={!proximaLibre}
+          onClick={() => proximaLibre && onReservar(proximaLibre)}
+          className="shrink-0 h-10 px-5 md:w-full md:mt-4 rounded-lg bg-white text-brand-primary font-sans font-semibold text-sm hover:bg-white/90 disabled:opacity-50"
+        >
+          Reservar Ya
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function OcupacionCard({ ocupacion }: { ocupacion: OcupacionDia[] }) {
+  const isoHoy = toISODate(new Date())
+  return (
+    <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5">
+      <div className="flex items-center justify-between mb-3">
+        <p className="font-sans font-semibold text-sm text-neutral-900 dark:text-neutral-50">
+          Ocupación Semanal
+        </p>
+        <BarChart3 className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
+      </div>
+      <div className="h-32 rounded-lg bg-neutral-50 dark:bg-neutral-900 flex items-end justify-between gap-1.5 px-2 pt-3 pb-1.5">
+        {ocupacion.map((dia) => {
+          const esHoy = toISODate(dia.fecha) === isoHoy
+          return (
+            <div key={dia.fecha.toISOString()} className="flex-1 h-full flex items-end">
+              <div
+                className={`w-full rounded-t ${esHoy ? 'bg-brand-primary' : 'bg-brand-secondary/60'}`}
+                style={{ height: `${Math.max(4, dia.porcentaje)}%` }}
+                title={`${dia.porcentaje}% ocupado`}
+              />
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex justify-between mt-2">
+        {DIAS_SEMANA.map((d, i) => (
+          <span
+            key={d + i}
+            className={`font-sans text-xs w-6 text-center ${
+              toISODate(ocupacion[i]?.fecha ?? new Date()) === isoHoy
+                ? 'font-bold text-neutral-900 dark:text-neutral-50'
+                : 'text-neutral-400 dark:text-neutral-500'
+            }`}
+          >
+            {d}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Cada Bloqueo es UNA franja de una hora (así se guardan en la base de
+// datos), así que un mantenimiento de 11 a 13h son en realidad 2 filas.
+// Antes esto generaba un mensaje por fila ("Cancha 1 en mantenimiento hoy
+// a las 11.", "Cancha 1 en mantenimiento hoy a las 12.", ...); acá se
+// agrupan por cancha y se arma un solo mensaje con el rango completo.
+function agruparBloqueosPorCancha(bloqueos: Bloqueo[]): string[] {
+  const porCancha = new Map<number, { nombre: string; horas: string[] }>()
+  for (const b of bloqueos) {
+    const entrada = porCancha.get(b.canchaId) ?? { nombre: b.canchaNombre, horas: [] }
+    entrada.horas.push(b.hora)
+    porCancha.set(b.canchaId, entrada)
+  }
+  return Array.from(porCancha.values()).map(({ nombre, horas }) => {
+    const ordenadas = [...horas].sort((a, c) => hourToNum(a) - hourToNum(c))
+    const inicio = ordenadas[0]!
+    const finNum = hourToNum(ordenadas[ordenadas.length - 1]!) + 1
+    const fin = `${String(finNum % 24).padStart(2, '0')}:00`
+    return `${nombre} en mantenimiento hoy de ${inicio} a ${fin}.`
+  })
+}
+
+function AvisoCard({ bloqueosHoy }: { bloqueosHoy: Bloqueo[] }) {
+  const sinAvisos = bloqueosHoy.length === 0
+  const mensaje = sinAvisos
+    ? 'No hay avisos de mantenimiento programados por ahora.'
+    : agruparBloqueosPorCancha(bloqueosHoy).join(' ')
+
+  return (
+    <div className="bg-brand-secondary/10 md:bg-brand-secondary/10 rounded-2xl border-l-4 border-brand-primary p-4">
+      <div className="hidden md:block">
+        <p className="font-sans font-semibold text-sm text-neutral-900 dark:text-neutral-50">
+          Aviso del Sistema
+        </p>
+        <p className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mt-1">
+          {mensaje}
+        </p>
+      </div>
+      <div className="md:hidden flex gap-3">
+        <AlertTriangle className={`h-5 w-5 shrink-0 mt-0.5 ${sinAvisos ? 'text-neutral-400 dark:text-neutral-500' : 'text-warning'}`} />
+        <div>
+          <p className={`font-sans font-semibold text-sm ${sinAvisos ? 'text-neutral-600 dark:text-neutral-300' : 'text-warning'}`}>
+            Aviso del Sistema
+          </p>
+          <p className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mt-1">
+            {mensaje}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PanelPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [menuAbierto, setMenuAbierto] = useState<number | null>(null)
 
   const hoy = new Date().toLocaleDateString('es-PE', {
@@ -48,123 +195,54 @@ export default function PanelPage() {
     month: 'long',
   })
 
-  // Datos reales del fake API (json-server), no hardcodeados. Se
-  // reemplaza por el fetch al backend real (US17-US19) en Sprint 2.
   const { data: alquileres = [], isLoading, isError } = useAlquileresHoy()
   const resumen = calcularResumen(alquileres)
+
+  const { data: canchas = [] } = useCanchas()
+  const { data: reservas = [] } = useReservas()
+  const isoHoy = toISODate(new Date())
+  const { data: bloqueosHoy = [] } = useBloqueos(isoHoy)
 
   async function marcarComoPagado(id: number, montoTotal: number) {
     setMenuAbierto(null)
     try {
-      await apiClient.patch(`/alquileres/${id}`, { estadoPago: 'PAGADO', montoPagado: montoTotal })
+
+      const alquiler = alquileres.find((a) => a.id === id)
+      const saldo = montoTotal - (alquiler?.montoPagado ?? 0)
+      if (saldo > 0) {
+        await apiClient.post('/payments', { bookingId: id, amount: saldo, method: 'EFECTIVO' })
+      }
       await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
-    } catch {
-      window.alert('No se pudo marcar como pagado. Intenta de nuevo.')
+    } catch (err) {
+      window.alert(getApiErrorMessage(err, 'No se pudo marcar como pagado. Intenta de nuevo.'))
     }
   }
 
   async function eliminarAlquiler(id: number) {
     setMenuAbierto(null)
-    if (!window.confirm('¿Eliminar este alquiler? Esta acción no se puede deshacer.')) return
+    if (!window.confirm('¿Cancelar este alquiler? Esta acción no se puede deshacer.')) return
     try {
-      await apiClient.delete(`/alquileres/${id}`)
+
+      await apiClient.post(`/bookings/${id}/cancelar`)
       await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
-    } catch {
-      window.alert('No se pudo eliminar el alquiler. Intenta de nuevo.')
+    } catch (err) {
+      window.alert(getApiErrorMessage(err, 'No se pudo cancelar el alquiler. Intenta de nuevo.'))
     }
   }
 
-  // Ingreso obtenido vs. lo que se espera cobrar hoy en total.
   const montoEsperado = alquileres.reduce((sum, a) => sum + a.montoTotal, 0)
   const porcentajeCobrado =
     montoEsperado > 0 ? Math.round((resumen.ingresoHoy / montoEsperado) * 100) : 0
 
-  // "Siguiente horario libre": la cancha que se desocupa más tarde
-  // entre los alquileres de hoy.
-  const proximaLibre = [...alquileres]
-    .sort((a, b) => a.horaFin.localeCompare(b.horaFin))
-    .at(-1)
+  const proximaLibre = calcularSiguienteHorarioLibre(canchas, alquileres)
+  const ocupacionSemanal = calcularOcupacionSemanal(reservas, canchas)
 
-  function SiguienteHorarioCard() {
-    return (
-      <div className="bg-brand-primary rounded-2xl p-5 text-white">
-        <div className="flex items-center justify-between gap-4 md:block">
-          <div>
-            <p className="font-sans text-xs tracking-wide uppercase text-white/70">
-              Siguiente Horario Libre
-            </p>
-            <p className="font-sans font-bold text-2xl md:text-3xl mt-1">
-              {proximaLibre ? proximaLibre.horaFin : '—'}
-              {proximaLibre && (
-                <span className="md:hidden"> - {proximaLibre.canchaNombre}</span>
-              )}
-            </p>
-            <p className="hidden md:block font-sans text-sm text-white/80 mt-1">
-              {proximaLibre ? proximaLibre.canchaNombre : 'Sin alquileres hoy'}
-            </p>
-          </div>
-          <button className="shrink-0 h-10 px-5 md:w-full md:mt-4 rounded-lg bg-white text-brand-primary font-sans font-semibold text-sm hover:bg-white/90">
-            Reservar Ya
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  function OcupacionCard() {
-    return (
-      <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <p className="font-sans font-semibold text-sm text-neutral-900 dark:text-neutral-50">
-            Ocupación Semanal
-          </p>
-          <BarChart3 className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
-        </div>
-        {/* Placeholder de gráfico: reemplazar por Chart.js/Recharts
-            cuando el backend entregue datos reales de ocupación
-            (US17-US19). */}
-        <div className="h-32 rounded-lg bg-neutral-50 dark:bg-neutral-900" />
-        <div className="flex justify-between mt-2">
-          {DIAS_SEMANA.map((d, i) => (
-            <span
-              key={d + i}
-              className={`font-sans text-xs w-6 text-center ${
-                i === 5 ? 'font-bold text-neutral-900 dark:text-neutral-50' : 'text-neutral-400 dark:text-neutral-500'
-              }`}
-            >
-              {d}
-            </span>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  function AvisoCard() {
-    return (
-      <div className="bg-brand-secondary/10 md:bg-brand-secondary/10 rounded-2xl border-l-4 border-brand-primary p-4">
-        <div className="hidden md:block">
-          <p className="font-sans font-semibold text-sm text-neutral-900 dark:text-neutral-50">
-            Aviso del Sistema
-          </p>
-          <p className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mt-1">
-            El mantenimiento de la Cancha 2 está programado para el lunes a
-            las 08:00 AM.
-          </p>
-        </div>
-        <div className="md:hidden flex gap-3">
-          <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-          <div>
-            <p className="font-sans font-semibold text-sm text-warning">
-              Aviso del Sistema
-            </p>
-            <p className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mt-1">
-              Mantenimiento programado para este domingo a las 23:00. El
-              sistema no estará disponible por 1 hora.
-            </p>
-          </div>
-        </div>
-      </div>
+  // Antes el botón "Reservar Ya" no tenía onClick: no pasaba nada al
+  // presionarlo. Ahora manda directo a Nueva Reserva prellenada con la
+  // cancha/fecha/hora que el propio Panel calculó como próxima libre.
+  function reservarProximaLibre(proxima: ProximaLibre) {
+    navigate(
+      `/calendario/nueva-reserva?canchaId=${proxima.canchaId}&fecha=${isoHoy}&horaInicio=${proxima.horaInicio}`,
     )
   }
 
@@ -181,13 +259,13 @@ export default function PanelPage() {
         Hoy, {hoy}
       </h1>
       <p className="hidden md:block font-sans text-base text-neutral-500 dark:text-neutral-400 mt-1">
-        Bienvenido de nuevo, Carlos. Tienes un día movido hoy.
+        Bienvenido de nuevo, {user?.nombreUsuario ?? 'administrador'}. {fraseDelDia(resumen.totalAlquileres)}
       </p>
 
       {isError && (
         <p className="font-sans text-sm text-danger mt-4">
-          No se pudieron cargar los datos del panel. Verifica que el fake API
-          (json-server) esté corriendo en el puerto 3001.
+          No se pudieron cargar los datos del panel. Verifica tu conexión o
+          que el servidor esté disponible.
         </p>
       )}
 
@@ -253,7 +331,7 @@ export default function PanelPage() {
 
       {/* ---------- MOBILE: apilado en una sola columna ---------- */}
       <div className="md:hidden mt-5 space-y-6">
-        <SiguienteHorarioCard />
+        <SiguienteHorarioCard proximaLibre={proximaLibre ?? null} onReservar={reservarProximaLibre} />
 
         <div>
           <h2 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50 mb-3">
@@ -295,10 +373,10 @@ export default function PanelPage() {
           <h2 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50 mb-3">
             Ocupación Semanal
           </h2>
-          <OcupacionCard />
+          <OcupacionCard ocupacion={ocupacionSemanal} />
         </div>
 
-        <AvisoCard />
+        <AvisoCard bloqueosHoy={bloqueosHoy} />
       </div>
 
       {/* ---------- DESKTOP: tabla + columna lateral ---------- */}
@@ -428,9 +506,9 @@ export default function PanelPage() {
 
         {/* Columna lateral */}
         <div className="space-y-5">
-          <SiguienteHorarioCard />
-          <OcupacionCard />
-          <AvisoCard />
+          <SiguienteHorarioCard proximaLibre={proximaLibre ?? null} onReservar={reservarProximaLibre} />
+          <OcupacionCard ocupacion={ocupacionSemanal} />
+          <AvisoCard bloqueosHoy={bloqueosHoy} />
         </div>
       </div>
 
@@ -469,6 +547,7 @@ export default function PanelPage() {
       {/* Botón flotante de acción rápida (solo mobile) */}
       <button
         aria-label="Nueva reserva"
+        onClick={() => navigate('/calendario/nueva-reserva')}
         className="md:hidden fixed bottom-24 right-5 h-14 w-14 rounded-full bg-brand-primary text-white shadow-lg flex items-center justify-center z-30"
       >
         <Plus className="h-6 w-6" />

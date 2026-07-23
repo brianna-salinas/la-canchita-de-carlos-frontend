@@ -1,0 +1,42 @@
+@startuml customers-module
+title Módulo: Customers (Clientes)
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "customers" {
+  interface Cliente {
+    +id: number
+    +nombre: string
+    +telefono: string
+    +dni?: string
+    +estado?: "ACTIVO" | "INACTIVO"
+    +fotoUrl?: string
+  }
+
+  class "useClientes" as useClientes << (F,orchid) hook >> {
+    +() : UseQueryResult<Cliente[]>
+  }
+
+  useClientes ..> Cliente : trae
+}
+
+package "componentes (pantallas)" {
+  class ClientesPage << (P,#F08080) página >>
+  ClientesPage ..> useClientes
+}
+
+package "shared.api" {
+  class apiClient << (O,#4DBECC) axios instance >>
+}
+
+useClientes --> apiClient : usa
+
+note bottom of useClientes
+  Fase de fake API (Sprint 1): lee /clientes de
+  json-server (db.json). Se reemplaza por
+  GET /api/customers cuando el backend real
+  esté conectado (Sprint 2).
+end note
+
+@enduml

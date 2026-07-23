@@ -21,10 +21,23 @@ import AppShell from '../../shared/components/AppShell'
 import { useCanchas, useReservas } from '../hooks/useCalendario'
 import { apiClient } from '../../shared/api/client'
 import { iniciales, formatFecha } from '../../shared/utils/format'
+import { getApiErrorMessage } from '../../shared/utils/api-error'
+import MetodoPagoIcon from '../../shared/components/MetodoPagoIcon'
 
-// Fecha con datos de ejemplo en db.json. El chip "Hoy" filtra por
-// esta fecha mientras el dataset del fake API siga anclado a ella.
 const FECHA_DEMO = '2026-07-11'
+
+type MetodoPago = 'EFECTIVO' | 'YAPE' | 'OTRO'
+
+// Antes esto no se preguntaba nunca: todo pago confirmado desde acá
+// (individual o de una serie completa) se registraba siempre como
+// "EFECTIVO", sin importar cómo pagó el cliente en realidad.
+const METODOS_PAGO: { value: MetodoPago; label: string }[] = [
+  { value: 'EFECTIVO', label: 'Efectivo' },
+  { value: 'YAPE', label: 'Yape / Plin' },
+  { value: 'OTRO', label: 'Otro (tarjeta, etc.)' },
+]
+
+type PagoPendiente = { tipo: 'individual' } | { tipo: 'serie'; serieId: string }
 
 const ESTADO_BADGE: Record<string, string> = {
   PAGADO: 'bg-success text-white',
@@ -66,6 +79,10 @@ export default function ReservasPage() {
   // parte de una serie (tipoReserva MULTIDIA o RECURRENTE).
   const [soloSeries, setSoloSeries] = useState(false)
   const [marcandoSerie, setMarcandoSerie] = useState<string | null>(null)
+  // Antes de ejecutar un pago (individual o de serie) se pregunta el método
+  // con este modal; pagoPendiente guarda qué acción ejecutar una vez elegido.
+  const [pagoPendiente, setPagoPendiente] = useState<PagoPendiente | null>(null)
+  const [procesandoPago, setProcesandoPago] = useState(false)
 
   function limpiarFiltros() {
     setFechaInicio('')
@@ -135,30 +152,33 @@ export default function ReservasPage() {
     })
   }, [reservas, fechaInicio, fechaFin, canchaFiltro, estadoFiltro, soloSeries, busqueda])
 
-  // Cuántas fechas de la serie siguen pendientes/parciales, para el
-  // badge de cada tarjeta/fila que pertenece a una serie.
   function pendientesDeSerie(serieId: string) {
     return reservas.filter((r) => r.serieId === serieId && r.estadoPago !== 'PAGADO').length
   }
 
-  async function marcarSeriePagada(serieId: string) {
+  function marcarSeriePagada(serieId: string) {
     if (!window.confirm('¿Marcar todas las fechas pendientes de esta serie como pagadas?')) return
+    setPagoPendiente({ tipo: 'serie', serieId })
+  }
+
+  async function ejecutarMarcarSeriePagada(serieId: string, metodo: MetodoPago) {
     setMarcandoSerie(serieId)
     try {
-      // No hay endpoint de "series" en el fake API: se recorre cada
-      // /alquileres que comparte el serieId y se marca como pagado
-      // individualmente. Se reemplaza por PATCH
-      // /api/bookings/series/:serieId/payment cuando el backend esté
-      // conectado (Sprint 2).
       const fechasDeLaSerie = reservas.filter((r) => r.serieId === serieId && r.estadoPago !== 'PAGADO')
       await Promise.all(
-        fechasDeLaSerie.map((r) =>
-          apiClient.patch(`/alquileres/${r.id}`, { estadoPago: 'PAGADO', montoPagado: r.montoTotal }),
-        ),
+        fechasDeLaSerie
+          .filter((r) => r.montoTotal - r.montoPagado > 0)
+          .map((r) =>
+            apiClient.post('/payments', {
+              bookingId: r.id,
+              amount: r.montoTotal - r.montoPagado,
+              method: metodo,
+            }),
+          ),
       )
       await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
-    } catch {
-      window.alert('No se pudo marcar la serie como pagada. Intenta de nuevo.')
+    } catch (err) {
+      window.alert(getApiErrorMessage(err, 'No se pudo marcar la serie como pagada. Intenta de nuevo.'))
     } finally {
       setMarcandoSerie(null)
     }
@@ -173,53 +193,84 @@ export default function ReservasPage() {
     })
   }
 
+  // Una reserva ya "Pagado" no tiene nada más que confirmar, así que no se
+  // puede seleccionar para "Confirmar Pago" (antes se podía marcar igual,
+  // aunque el botón no tuviera ningún efecto real sobre ella).
+  const reservasSeleccionables = useMemo(
+    () => reservasFiltradas.filter((r) => r.estadoPago !== 'PAGADO'),
+    [reservasFiltradas],
+  )
+
   function toggleSeleccionTodas() {
     setSeleccionadas((prev) =>
-      prev.size === reservasFiltradas.length
+      prev.size === reservasSeleccionables.length && reservasSeleccionables.length > 0
         ? new Set()
-        : new Set(reservasFiltradas.map((r) => r.id)),
+        : new Set(reservasSeleccionables.map((r) => r.id)),
     )
   }
 
-  async function confirmarPago() {
+  function confirmarPago() {
     if (seleccionadas.size === 0) return
+    setPagoPendiente({ tipo: 'individual' })
+  }
+
+  async function ejecutarConfirmarPago(metodo: MetodoPago) {
     setConfirmando(true)
     try {
-      // Se reemplaza por PATCH /api/bookings/:id/payment (RF de
-      // Payments) cuando el backend esté conectado (Sprint 2).
       await Promise.all(
         [...seleccionadas].map((id) => {
           const r = reservas.find((x) => x.id === id)
-          if (!r) return Promise.resolve()
-          return apiClient.patch(`/alquileres/${id}`, {
-            estadoPago: 'PAGADO',
-            montoPagado: r.montoTotal,
+          if (!r || r.montoTotal - r.montoPagado <= 0) return Promise.resolve()
+          return apiClient.post('/payments', {
+            bookingId: id,
+            amount: r.montoTotal - r.montoPagado,
+            method: metodo,
           })
         }),
       )
       await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
       setSeleccionadas(new Set())
-    } catch {
-      window.alert('No se pudo confirmar el pago. Intenta de nuevo.')
+    } catch (err) {
+      window.alert(getApiErrorMessage(err, 'No se pudo confirmar el pago. Intenta de nuevo.'))
     } finally {
       setConfirmando(false)
     }
   }
 
+  async function confirmarConMetodo(metodo: MetodoPago) {
+    if (!pagoPendiente) return
+    setProcesandoPago(true)
+    try {
+      if (pagoPendiente.tipo === 'serie') {
+        await ejecutarMarcarSeriePagada(pagoPendiente.serieId, metodo)
+      } else {
+        await ejecutarConfirmarPago(metodo)
+      }
+    } finally {
+      setProcesandoPago(false)
+      setPagoPendiente(null)
+    }
+  }
+
   async function eliminarReserva(id: number) {
-    if (!window.confirm('¿Eliminar esta reserva? Esta acción no se puede deshacer.')) {
+    if (!window.confirm('¿Cancelar esta reserva? Esta acción no se puede deshacer.')) {
       return
     }
     try {
-      await apiClient.delete(`/alquileres/${id}`)
+      await apiClient.post(`/bookings/${id}/cancelar`)
       await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
-    } catch {
-      window.alert('No se pudo eliminar la reserva. Intenta de nuevo.')
+    } catch (err) {
+      window.alert(getApiErrorMessage(err, 'No se pudo cancelar la reserva. Intenta de nuevo.'))
     }
   }
 
   return (
-    <AppShell searchPlaceholder="Buscar reservas o clientes..." minimalMobile>
+    <AppShell
+      searchPlaceholder="Buscar por ID, cliente o teléfono..."
+      searchValue={busqueda}
+      onSearchChange={setBusqueda}
+      minimalMobile
+    >
       {/* Barra superior mobile */}
       <div className="md:hidden sticky top-0 z-20 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -313,8 +364,8 @@ export default function ReservasPage() {
 
         {isError && (
           <p className="font-sans text-sm text-danger">
-            No se pudieron cargar las reservas. Verifica que el fake API
-            (json-server) esté corriendo en el puerto 3001.
+            No se pudieron cargar las reservas. Verifica tu conexión o que
+            el servidor esté disponible.
           </p>
         )}
 
@@ -340,8 +391,10 @@ export default function ReservasPage() {
                 <input
                   type="checkbox"
                   checked={seleccionada}
+                  disabled={r.estadoPago === 'PAGADO'}
                   onChange={() => toggleSeleccion(r.id)}
-                  className="h-4 w-4 mt-1 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary shrink-0"
+                  title={r.estadoPago === 'PAGADO' ? 'Esta reserva ya está pagada' : undefined}
+                  className="h-4 w-4 mt-1 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary shrink-0 disabled:opacity-40"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
@@ -542,8 +595,8 @@ export default function ReservasPage() {
 
       {isError && (
         <p className="hidden md:block font-sans text-sm text-danger mt-4">
-          No se pudieron cargar las reservas. Verifica que el fake API
-          (json-server) esté corriendo en el puerto 3001.
+          No se pudieron cargar las reservas. Verifica tu conexión o que el
+          servidor esté disponible.
         </p>
       )}
 
@@ -556,11 +609,12 @@ export default function ReservasPage() {
                 <input
                   type="checkbox"
                   checked={
-                    reservasFiltradas.length > 0 &&
-                    seleccionadas.size === reservasFiltradas.length
+                    reservasSeleccionables.length > 0 &&
+                    seleccionadas.size === reservasSeleccionables.length
                   }
+                  disabled={reservasSeleccionables.length === 0}
                   onChange={toggleSeleccionTodas}
-                  className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary"
+                  className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary disabled:opacity-40"
                 />
               </th>
               <th className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase font-semibold px-2 py-3">ID</th>
@@ -595,8 +649,10 @@ export default function ReservasPage() {
                     <input
                       type="checkbox"
                       checked={seleccionadas.has(r.id)}
+                      disabled={r.estadoPago === 'PAGADO'}
                       onChange={() => toggleSeleccion(r.id)}
-                      className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary"
+                      title={r.estadoPago === 'PAGADO' ? 'Esta reserva ya está pagada' : undefined}
+                      className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary disabled:opacity-40"
                     />
                   </td>
                   <td className="px-2 py-4 font-sans text-sm font-semibold text-neutral-700 dark:text-neutral-200">
@@ -676,6 +732,47 @@ export default function ReservasPage() {
           </tbody>
         </table>
       </div>
+
+      {pagoPendiente && (
+        <div
+          className="fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/40 md:px-4"
+          onClick={() => !procesandoPago && setPagoPendiente(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-neutral-800 w-full max-w-sm rounded-t-2xl md:rounded-2xl p-5 md:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-6"
+          >
+            <h2 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50 mb-1">
+              ¿Cómo pagó el cliente?
+            </h2>
+            <p className="font-sans text-sm text-neutral-500 dark:text-neutral-400 mb-4">
+              Selecciona el método de pago para confirmar{pagoPendiente.tipo === 'serie' ? ' esta serie' : ''}.
+            </p>
+            <div className="grid grid-cols-1 gap-2 mb-4">
+              {METODOS_PAGO.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={procesandoPago}
+                  onClick={() => confirmarConMetodo(value)}
+                  className="h-12 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm font-medium text-neutral-700 dark:text-neutral-200 hover:border-brand-primary hover:text-brand-primary hover:bg-brand-primary/5 disabled:opacity-50 flex items-center gap-3 px-4"
+                >
+                  <MetodoPagoIcon value={value} className="h-5 w-5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={procesandoPago}
+              onClick={() => setPagoPendiente(null)}
+              className="w-full h-10 rounded-lg font-sans text-sm font-medium text-neutral-500 dark:text-neutral-400 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </AppShell>
   )
 }

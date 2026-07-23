@@ -1,0 +1,72 @@
+@startuml settings-module
+title Módulo: Settings (Ajustes + Solicitudes de Acceso)
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "settings" {
+  interface Solicitud {
+    +id: number
+    +nombre: string
+    +correo: string
+    +creadoEn: string
+    +estado: "PENDIENTE" | "APROBADO" | "RECHAZADO"
+  }
+
+  interface Usuario {
+    +id: string
+    +nombre: string
+    +correo: string
+    +esDueno: boolean
+    +estado: "ACTIVO" | "INACTIVO"
+    +ultimoAcceso?: string
+  }
+
+  class "useSolicitudes" as useSolicitudes << (F,orchid) hook >> {
+    +() : UseQueryResult<Solicitud[]>
+  }
+
+  class "useAprobarSolicitud" as useAprobarSolicitud << (F,orchid) hook >> {
+    +() : (solicitud: Solicitud) => Promise<void>
+  }
+
+  class "useRechazarSolicitud" as useRechazarSolicitud << (F,orchid) hook >> {
+    +() : (id: number) => Promise<void>
+  }
+
+  class "useUsuarios" as useUsuarios << (F,orchid) hook >> {
+    +() : UseQueryResult<Usuario[]>
+  }
+
+  class "formatFechaLarga" as formatFechaLarga << (F,orchid) función >>
+  class "formatFechaRelativa" as formatFechaRelativa << (F,orchid) función >>
+  class "formatActivoHace" as formatActivoHace << (F,orchid) función >>
+
+  useSolicitudes ..> Solicitud : trae
+  useAprobarSolicitud ..> Solicitud : actualiza
+  useRechazarSolicitud ..> Solicitud : actualiza
+  useUsuarios ..> Usuario : trae
+  formatFechaLarga ..> Solicitud : formatea
+  formatFechaRelativa ..> Solicitud : formatea
+  formatActivoHace ..> Usuario : formatea
+}
+
+package "componentes (pantallas)" {
+  class AjustesPage << (P,#F08080) página >>
+  class SolicitudesAccesoPage << (P,#F08080) página >>
+
+  AjustesPage ..> useUsuarios
+  SolicitudesAccesoPage ..> useSolicitudes
+  SolicitudesAccesoPage ..> useAprobarSolicitud
+  SolicitudesAccesoPage ..> useRechazarSolicitud
+}
+
+note bottom of useAprobarSolicitud
+  Fase de fake API (Sprint 1): dos escrituras
+  separadas contra json-server (PATCH solicitud +
+  POST usuario), sin transacción. El backend real
+  (authorizeAdminRequest.usecase.ts, Sprint 2) ya
+  hace esto de forma atómica.
+end note
+
+@enduml

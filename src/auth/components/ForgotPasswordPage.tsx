@@ -9,10 +9,6 @@ export default function ForgotPasswordPage() {
   const [enviado, setEnviado] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // No hay endpoint de recuperación de contraseña todavía (no está en
-  // el backlog documentado). Por ahora solo simula el envío en el
-  // fake API; se reemplaza por POST /api/auth/forgot-password cuando
-  // se defina esa historia y se conecte el backend real (Sprint 2).
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
@@ -135,7 +131,7 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-12 rounded-lg bg-brand-primary text-white font-sans font-semibold text-base hover:bg-brand-primary/90 transition-colors disabled:opacity-60"
+                className="w-full h-12 rounded-lg bg-brand-secondary text-neutral-900 font-sans font-semibold text-base hover:bg-brand-secondary/90 transition-colors disabled:opacity-60"
               >
                 {loading ? 'Enviando...' : 'Enviar instrucciones'}
               </button>

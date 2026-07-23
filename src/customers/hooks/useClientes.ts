@@ -6,22 +6,36 @@ export interface Cliente {
   nombre: string
   telefono: string
   dni?: string
-  // "ACTIVO" | "INACTIVO" — opcional porque db.json todavía no lo
-  // trae para todos los clientes de ejemplo. Si falta, la UI lo
-  // trata como "ACTIVO" por defecto.
   estado?: 'ACTIVO' | 'INACTIVO'
   fotoUrl?: string
 }
 
-// Trae todos los clientes del fake API (json-server). Se reemplaza
-// por GET /api/customers (RF09, Subdominio Customers) cuando el
-// backend esté conectado (Sprint 2).
+interface CustomerApiRow {
+  id: number
+  name: string
+  phone: string
+  documentNumber?: string | null
+  status?: string
+  photoUrl?: string | null
+}
+
+function mapCustomerToCliente(row: CustomerApiRow): Cliente {
+  return {
+    id: row.id,
+    nombre: row.name,
+    telefono: row.phone,
+    dni: row.documentNumber ?? undefined,
+    estado: row.status === 'INACTIVE' ? 'INACTIVO' : 'ACTIVO',
+    fotoUrl: row.photoUrl ?? undefined,
+  }
+}
+
 export function useClientes() {
   return useQuery({
     queryKey: ['clientes'],
     queryFn: async () => {
-      const { data } = await apiClient.get<Cliente[]>('/clientes')
-      return data
+      const { data } = await apiClient.get('/customers')
+      return (data as CustomerApiRow[]).map(mapCustomerToCliente)
     },
   })
 }

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type ReactNode, type ChangeEvent } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   Search,
@@ -12,44 +12,10 @@ import {
   User,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { useNotificaciones, useMarcarNotificacionLeida, type Notificacion } from '../hooks/useNotificaciones'
 import Sidebar from './Sidebar'
 import ThemeToggle from './ThemeToggle'
 
-interface Notificacion {
-  id: number
-  titulo: string
-  descripcion: string
-  hora: string
-  leida: boolean
-}
-
-// Datos de ejemplo (fake API, Sprint 1). Se reemplaza por
-// GET /api/notifications cuando el backend esté conectado (Sprint 2).
-const NOTIFICACIONES_INICIALES: Notificacion[] = [
-  {
-    id: 1,
-    titulo: 'Mantenimiento programado',
-    descripcion: 'Cancha 2 no estará disponible el domingo de 22:00 a 23:00.',
-    hora: 'Hace 2 h',
-    leida: false,
-  },
-  {
-    id: 2,
-    titulo: 'Pago pendiente',
-    descripcion: 'Lucía Fernández tiene un cobro pendiente de S/40.',
-    hora: 'Hace 3 h',
-    leida: false,
-  },
-  {
-    id: 3,
-    titulo: 'Nueva solicitud de acceso',
-    descripcion: 'Alguien solicitó acceso como administrador.',
-    hora: 'Ayer',
-    leida: true,
-  },
-]
-
-/** Panel desplegable de notificaciones, anclado al ícono de campana. */
 function NotificationsPanel({
   notificaciones,
   align,
@@ -118,13 +84,25 @@ function NotificationsPanel({
   )
 }
 
-/** Foto de perfil del usuario, o un ícono redondo genérico si no tiene una. */
 function UserAvatar({ fotoUrl, size = 'h-9 w-9' }: { fotoUrl?: string; size?: string }) {
-  if (fotoUrl) {
+  // La URL firmada de Supabase vence a la hora; si expiró (o cualquier otro
+  // error de carga), en vez de mostrarse rota/en blanco se cae a las
+  // iniciales, igual que cuando no hay foto. El reset de "fallaCarga" cuando
+  // cambia fotoUrl se hace durante el render (patrón recomendado por React
+  // para ajustar estado ante cambios de props), no en un efecto.
+  const [fallaCarga, setFallaCarga] = useState(false)
+  const [fotoUrlAnterior, setFotoUrlAnterior] = useState(fotoUrl)
+  if (fotoUrl !== fotoUrlAnterior) {
+    setFotoUrlAnterior(fotoUrl)
+    setFallaCarga(false)
+  }
+
+  if (fotoUrl && !fallaCarga) {
     return (
       <img
         src={fotoUrl}
         alt="Foto de perfil"
+        onError={() => setFallaCarga(true)}
         className={`${size} rounded-full object-cover`}
       />
     )
@@ -147,19 +125,16 @@ const MOBILE_NAV_ITEMS = [
 ]
 
 interface AppShellProps {
-  /** Título mostrado en el buscador superior, ej. "Buscar reservas o clientes..." */
   searchPlaceholder?: string
-  /** Muestra la barra de búsqueda superior. Desactívala en pantallas
-   * que no listan/filtran registros (ej. Panel). Por defecto: true. */
   showSearch?: boolean
-  /** Contenido extra que se muestra dentro del header oscuro móvil,
-   * debajo del logo (ej. el saludo "Hoy, {fecha}" del Panel). Se
-   * ignora en desktop. */
+  // Antes este input no tenía value/onChange: se veía pero no filtraba nada
+  // en ninguna pantalla (Reservas, Clientes). Si la pantalla pasa estas
+  // props, el buscador queda controlado y realmente filtra; si no las pasa,
+  // sigue siendo un input suelto (sin efecto) para las pantallas que no lo
+  // necesitan.
+  searchValue?: string
+  onSearchChange?: (value: string) => void
   mobileHero?: ReactNode
-  /** Para flujos de pantalla completa en mobile (ej. formularios
-   * multi-paso como Nueva Reserva): oculta el header oscuro y la
-   * barra de navegación inferior, dejando que la propia pantalla
-   * controle su encabezado (ej. "← Volver"). No afecta desktop. */
   minimalMobile?: boolean
   children: ReactNode
 }
@@ -174,17 +149,20 @@ interface AppShellProps {
 export default function AppShell({
   searchPlaceholder = 'Buscar reservas o clientes...',
   showSearch = true,
+  searchValue,
+  onSearchChange,
   mobileHero,
   minimalMobile = false,
   children,
 }: AppShellProps) {
   const { user } = useAuth()
-  const [notificaciones, setNotificaciones] = useState(NOTIFICACIONES_INICIALES)
+  const { data: notificaciones = [] } = useNotificaciones()
+  const marcarLeida = useMarcarNotificacionLeida()
   const [notifOpen, setNotifOpen] = useState(false)
   const hayNoLeidas = notificaciones.some((n) => !n.leida)
 
   function marcarTodasLeidas() {
-    setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })))
+    notificaciones.filter((n) => !n.leida).forEach((n) => marcarLeida.mutate(n.id))
   }
 
   return (
@@ -234,7 +212,7 @@ export default function AppShell({
                 <div className="flex items-center gap-2">
                   <div className="text-right">
                     <p className="font-sans text-sm font-semibold leading-none">
-                      {user?.nombre ?? 'carlitos_admin'}
+                      {user?.nombreUsuario ?? 'carlitos_admin'}
                     </p>
                     <p className="font-sans text-xs text-neutral-400 mt-0.5">
                       {user?.esDueno ? 'Administrador Principal' : 'Administrador'}
@@ -321,6 +299,9 @@ export default function AppShell({
                 type="text"
                 placeholder={searchPlaceholder}
                 className="w-full h-10 pl-10 pr-3 rounded-lg border border-neutral-200 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-500 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+                {...(onSearchChange
+                  ? { value: searchValue ?? '', onChange: (e: ChangeEvent<HTMLInputElement>) => onSearchChange(e.target.value) }
+                  : {})}
               />
             </div>
           )}
@@ -360,7 +341,7 @@ export default function AppShell({
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50 leading-none">
-                  {user?.nombre ?? 'carlitos_admin'}
+                  {user?.nombreUsuario ?? 'carlitos_admin'}
                 </p>
                 <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
                   {user?.esDueno ? 'Administrador Principal' : 'Administrador'}

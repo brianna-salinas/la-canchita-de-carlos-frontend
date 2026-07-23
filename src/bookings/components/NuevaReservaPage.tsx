@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import {
   ChevronRight,
   ArrowLeft,
@@ -17,15 +17,21 @@ import {
   CalendarRange,
   Info,
 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import AppShell from '../../shared/components/AppShell'
 import { useCanchas, useReservas } from '../hooks/useCalendario'
 import { useClientes, type Cliente } from '../../customers/hooks/useClientes'
 import { apiClient } from '../../shared/api/client'
 import { formatFecha } from '../../shared/utils/format'
+import { getApiErrorMessage } from '../../shared/utils/api-error'
+import { esTelefonoValido } from '../../shared/utils/validation'
+import { toISODate, toHHmm } from '../../shared/utils/date'
+import MetodoPagoIcon from '../../shared/components/MetodoPagoIcon'
 
 type TipoReserva = 'UNICA' | 'MULTIDIA' | 'RECURRENTE'
 type ModoPagoSerie = 'INDIVIDUAL' | 'ACUMULADO'
 type EstadoPago = 'PENDIENTE' | 'PARCIAL' | 'PAGADO'
+type MetodoPago = 'EFECTIVO' | 'YAPE' | 'OTRO'
 
 const TIPOS_RESERVA: { value: TipoReserva; label: string; ayuda: string; icon: typeof CalendarRange }[] = [
   { value: 'UNICA', label: 'Única', ayuda: 'Un solo día, cualquier duración.', icon: Clock },
@@ -49,6 +55,16 @@ const ESTADO_PAGO_COLOR: Record<EstadoPago, string> = {
   PARCIAL: 'border-warning text-warning bg-warning/5',
   PAGADO: 'border-success text-success bg-success/5',
 }
+
+// Antes esto no se le preguntaba al usuario para nada: cada pago se
+// registraba siempre como "EFECTIVO" sin importar cómo pagó el cliente en
+// realidad (Yape, tarjeta, etc.), así que el dato quedaba mal desde que se
+// creaba la reserva.
+const METODOS_PAGO: { value: MetodoPago; label: string }[] = [
+  { value: 'EFECTIVO', label: 'Efectivo' },
+  { value: 'YAPE', label: 'Yape / Plin' },
+  { value: 'OTRO', label: 'Otro (tarjeta, etc.)' },
+]
 
 function horasEntre(inicio: string, fin: string): number {
   if (!inicio || !fin) return 0
@@ -74,8 +90,6 @@ function sumarDias(fechaISO: string, dias: number): string {
   return `${y}-${m}-${dd}`
 }
 
-// Tope de 60 fechas por serie (torneos largos o recurrencias de hasta
-// ~1 año semanal) para no generar de más por un error de captura.
 const TOPE_FECHAS_SERIE = 60
 
 function generarFechasMultidia(inicio: string, fin: string): string[] {
@@ -95,61 +109,85 @@ function generarFechasRecurrentes(inicio: string, repeticiones: number): string[
   return Array.from({ length: total }, (_, i) => sumarDias(inicio, i * 7))
 }
 
-function generarSerieId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
-  return `serie-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
 export default function NuevaReservaPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
   const editando = Boolean(id)
 
   const { data: canchas = [], isLoading: cargandoCanchas } = useCanchas()
   const { data: reservas = [] } = useReservas()
   const { data: clientes = [] } = useClientes()
-  // Guarda el id ya precargado para no repetir el prefill en cada
-  // render, pero sí volver a hacerlo si se navega de "editar A" a
-  // "editar B" sin desmontar el componente.
+
   const cargadoRef = useRef<string | null>(null)
+  const prellenadoRef = useRef(false)
+  // Guarda la fecha/hora original de la reserva al entrar a editar, para solo
+  // exigir "no pasado" si el usuario realmente las está cambiando (igual que
+  // el backend: editar otros campos de una reserva ya pasada no debe
+  // bloquearse por su fecha original).
+  const fechaHoraOriginalRef = useRef<{ fecha: string; horaInicio: string } | null>(null)
 
   const [canchaId, setCanchaId] = useState<number | null>(null)
   const [fecha, setFecha] = useState('')
   const [horaInicio, setHoraInicio] = useState('10:00')
   const [horaFin, setHoraFin] = useState('11:00')
 
-  // Tipo de reserva y campos de serie (solo aplican al crear; una
-  // reserva ya guardada se edita siempre como una fecha individual).
+
   const [tipoReserva, setTipoReserva] = useState<TipoReserva>('UNICA')
   const [fechaFinMultidia, setFechaFinMultidia] = useState('')
   const [repeticiones, setRepeticiones] = useState(4)
   const [modoPagoSerie, setModoPagoSerie] = useState<ModoPagoSerie>('INDIVIDUAL')
-  // Info de la serie a la que pertenece la reserva que se está
-  // editando (si aplica), solo para mostrar el aviso informativo.
+
   const [serieInfoEdicion, setSerieInfoEdicion] = useState<{ etiqueta: string; indice: number; total: number } | null>(null)
 
   const [busquedaCliente, setBusquedaCliente] = useState('')
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null)
+
+  // Modal para registrar un cliente nuevo real (POST /customers) sin salir
+  // del flujo de la reserva — antes el botón "+ Nuevo"/"Registrar nuevo
+  // cliente" no hacía nada, lo que empujaba a guardar reservas con solo un
+  // nombre escrito y ningún cliente real detrás.
+  const [modalClienteAbierto, setModalClienteAbierto] = useState(false)
+  const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', telefono: '', dni: '' })
+  const [errorNuevoCliente, setErrorNuevoCliente] = useState<string | null>(null)
+  const [guardandoCliente, setGuardandoCliente] = useState(false)
 
   const canchaSeleccionada = canchas.find((c) => c.id === canchaId) ?? null
 
   const [montoTotal, setMontoTotal] = useState('')
   const [montoPagado, setMontoPagado] = useState('')
   const [estadoPago, setEstadoPago] = useState<EstadoPago>('PENDIENTE')
+  const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO')
 
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
   const duracionHoras = horasEntre(horaInicio, horaFin)
 
-  // Precarga el formulario cuando se abre en modo edición
-  // (/calendario/nueva-reserva/:id/editar), una sola vez, apenas
-  // reservas y clientes ya cargaron.
+  // No tiene sentido reservar en una fecha/hora que ya pasó. `hoyISO` fija el
+  // mínimo seleccionable en el date picker, y `esFechaHoraPasada` se usa además
+  // en el submit (por si el usuario cambia la fecha del sistema o pega un
+  // valor manualmente) para dar un mensaje de error claro.
+  const hoyISO = toISODate(new Date())
+  function esFechaHoraPasada(fechaSel: string, horaSel: string): boolean {
+    if (!fechaSel) return false
+    if (fechaSel < hoyISO) return true
+    if (fechaSel > hoyISO) return false
+    return Boolean(horaSel) && horaSel < toHHmm(new Date())
+  }
+
+  // Sincroniza el formulario con la reserva real una vez que
+  // reservas/clientes (fuente externa asíncrona) llegan. Es el caso
+  // legítimo de "sincronizar con un sistema externo" que documenta React
+  // para useEffect, así que se silencia puntualmente la regla que asume
+  // que todo setState en un efecto podría evitarse derivándolo en el render.
   useEffect(() => {
     if (!editando || !id || cargadoRef.current === id) return
     const reserva = reservas.find((r) => String(r.id) === id)
     if (!reserva) return
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCanchaId(reserva.canchaId)
     setFecha(reserva.fecha)
     setHoraInicio(reserva.horaInicio)
@@ -157,6 +195,7 @@ export default function NuevaReservaPage() {
     setMontoTotal(String(reserva.montoTotal))
     setMontoPagado(String(reserva.montoPagado))
     setEstadoPago(reserva.estadoPago)
+    fechaHoraOriginalRef.current = { fecha: reserva.fecha, horaInicio: reserva.horaInicio }
 
     if (reserva.serieId) {
       const fechasSerie = reservas.filter((r) => r.serieId === reserva.serieId)
@@ -174,9 +213,6 @@ export default function NuevaReservaPage() {
         setBusquedaCliente(cliente.nombre)
       }
     } else if (reserva.clienteNombre) {
-      // Reservas grupales (clienteId null, ej. "Club Atlético
-      // Juniors"): no hay un Cliente real que seleccionar, así que se
-      // arma uno local solo para no bloquear la validación del form.
       setClienteSeleccionado({ id: 0, nombre: reserva.clienteNombre, telefono: '' })
       setBusquedaCliente(reserva.clienteNombre)
     }
@@ -184,8 +220,79 @@ export default function NuevaReservaPage() {
     cargadoRef.current = id
   }, [editando, id, reservas, clientes])
 
+  // Prellenado al venir desde el "+" de una celda "Libre" en el Calendario
+  // (?canchaId=&fecha=&horaInicio=) — antes ese botón no hacía nada.
+  useEffect(() => {
+    if (editando || prellenadoRef.current) return
+    const canchaIdParam = searchParams.get('canchaId')
+    const fechaParam = searchParams.get('fecha')
+    const horaParam = searchParams.get('horaInicio')
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (canchaIdParam) setCanchaId(Number(canchaIdParam))
+    if (fechaParam) setFecha(fechaParam)
+    if (horaParam) {
+      setHoraInicio(horaParam)
+      const h = parseInt(horaParam.split(':')[0], 10)
+      setHoraFin(`${String(h + 1).padStart(2, '0')}:00`)
+    }
+    prellenadoRef.current = true
+  }, [editando, searchParams])
+
+  // Completa el monto automáticamente cuando la cancha llega prellenada por
+  // query params (el efecto anterior no puede calcularlo porque `canchas`
+  // todavía no había cargado cuando se ejecutó).
+  useEffect(() => {
+    if (editando || !canchaId || montoTotal) return
+    const cancha = canchas.find((c) => c.id === canchaId)
+    if (cancha) {
+      recalcularMonto(cancha.precioHora, duracionHoras)
+    }
+  }, [editando, canchaId, canchas, montoTotal, duracionHoras])
+
   function recalcularMonto(precioHora: number, horas: number) {
     if (horas > 0) setMontoTotal(String(Math.round(precioHora * horas * 100) / 100))
+  }
+
+  function abrirNuevoCliente() {
+    setNuevoCliente({ nombre: busquedaCliente.trim(), telefono: '', dni: '' })
+    setErrorNuevoCliente(null)
+    setModalClienteAbierto(true)
+  }
+
+  async function guardarNuevoCliente() {
+    if (!nuevoCliente.nombre.trim()) {
+      setErrorNuevoCliente('El nombre no puede estar vacío.')
+      return
+    }
+    if (!esTelefonoValido(nuevoCliente.telefono)) {
+      setErrorNuevoCliente('El teléfono no es válido (debe ser un celular peruano de 9 dígitos).')
+      return
+    }
+    setErrorNuevoCliente(null)
+    setGuardandoCliente(true)
+    try {
+      const { data: creado } = await apiClient.post('/customers', {
+        name: nuevoCliente.nombre.trim(),
+        phone: nuevoCliente.telefono.trim(),
+        documentNumber: nuevoCliente.dni.trim() || undefined,
+      })
+      const clienteCreado: Cliente = {
+        id: creado.id,
+        nombre: creado.name,
+        telefono: creado.phone,
+        dni: creado.documentNumber ?? undefined,
+        estado: 'ACTIVO',
+      }
+      await queryClient.invalidateQueries({ queryKey: ['clientes'] })
+      setClienteSeleccionado(clienteCreado)
+      setBusquedaCliente(clienteCreado.nombre)
+      setModalClienteAbierto(false)
+    } catch (err) {
+      setErrorNuevoCliente(getApiErrorMessage(err, 'No se pudo registrar el cliente. Intenta de nuevo.'))
+    } finally {
+      setGuardandoCliente(false)
+    }
   }
 
   function seleccionarCancha(idCancha: number) {
@@ -211,9 +318,6 @@ export default function NuevaReservaPage() {
     if (estado === 'PENDIENTE') setMontoPagado('0')
   }
 
-  // Disponibilidad de cada cancha para la fecha/hora elegidas: si aún
-  // no se eligió fecha, se muestran todas como disponibles (no hay
-  // con qué comparar todavía).
   function disponibilidadDe(idCancha: number) {
     if (!fecha || !horaFin) return true
     return !reservas.some(
@@ -239,8 +343,6 @@ export default function NuevaReservaPage() {
       .slice(0, 5)
   }, [busquedaCliente, clientes])
 
-  // Vista previa de las fechas que se generarán para MULTIDIA /
-  // RECURRENTE, solo para mostrarle al usuario qué va a crear.
   const fechasPrevisualizadas = useMemo(() => {
     if (tipoReserva === 'MULTIDIA' && fecha && fechaFinMultidia && fechaFinMultidia >= fecha) {
       return generarFechasMultidia(fecha, fechaFinMultidia)
@@ -267,8 +369,28 @@ export default function NuevaReservaPage() {
       setError('La hora de fin debe ser posterior a la hora de inicio.')
       return
     }
+    // El input type="time" ya limita el picker con min/max, pero eso no
+    // impide escribir la hora a mano fuera de rango (ni pegar un valor). El
+    // backend igual lo rechaza, pero hay que avisarlo aca antes de mandar la
+    // petición, no solo dejar que se vea como "no se pudo guardar".
+    if (
+      canchaSeleccionada.horaApertura &&
+      canchaSeleccionada.horaCierre &&
+      (horaInicio < canchaSeleccionada.horaApertura || horaFin > canchaSeleccionada.horaCierre)
+    ) {
+      setError(
+        `Esta cancha solo está disponible de ${canchaSeleccionada.horaApertura} a ${canchaSeleccionada.horaCierre}.`,
+      )
+      return
+    }
+    const original = fechaHoraOriginalRef.current
+    const cambioFechaHora = !editando || !original || fecha !== original.fecha || horaInicio !== original.horaInicio
+    if (cambioFechaHora && esFechaHoraPasada(fecha, horaInicio)) {
+      setError('No se pueden registrar reservas en una fecha u hora que ya pasó.')
+      return
+    }
     if (!clienteSeleccionado) {
-      setError('Busca y selecciona un cliente.')
+      setError("Busca y selecciona un cliente registrado, o usa 'Registrar nuevo cliente' para crear uno.")
       return
     }
     if (!editando && tipoReserva === 'MULTIDIA' && (!fechaFinMultidia || fechaFinMultidia < fecha)) {
@@ -282,39 +404,52 @@ export default function NuevaReservaPage() {
 
     setGuardando(true)
     try {
-      const basePayload = {
-        canchaId: canchaSeleccionada.id,
-        canchaNombre: canchaSeleccionada.nombre,
-        // clienteId 0 marca un cliente "sintético" armado solo para
-        // precargar una reserva grupal en modo edición (ver useEffect
-        // de arriba); en ese caso se guarda como reserva sin cliente
-        // real, igual que estaba antes de editarla.
-        clienteId: clienteSeleccionado.id === 0 ? null : clienteSeleccionado.id,
-        clienteNombre: clienteSeleccionado.nombre,
-        tipo: canchaSeleccionada.deporte,
-        horaInicio,
-        horaFin,
-        estado: 'RESERVADO',
-        estadoPago,
-        montoTotal: Number(montoTotal) || 0,
-        montoPagado: Number(montoPagado) || 0,
-      }
+      const customerId = clienteSeleccionado.id === 0 ? undefined : clienteSeleccionado.id
+      const montoTotalNum = Number(montoTotal) || 0
+      const montoPagadoNum = Number(montoPagado) || 0
 
       if (editando && id) {
-        // Se reemplaza por PATCH /api/bookings/:id (US17-US19) cuando
-        // el backend esté conectado (Sprint 2). Por ahora pega al
-        // fake API. Editar solo actualiza esta fecha puntual, aunque
-        // sea parte de una serie.
-        await apiClient.patch(`/alquileres/${id}`, { ...basePayload, fecha })
+        // Antes solo se registraba un pago adicional (POST /payments, que
+        // solo suma) cuando el monto pagado aumentaba, así que no había
+        // forma de corregir el total ni de bajar el pago (ej. revertir un
+        // "Pagado" a "Parcial" por error). Ahora se envían totalAmount y
+        // paidAmount directamente en el PATCH, y el backend recalcula el
+        // estado de pago correspondiente.
+        await apiClient.patch(`/bookings/${id}`, {
+          courtId: canchaSeleccionada.id,
+          customerName: clienteSeleccionado.nombre,
+          type: canchaSeleccionada.deporte,
+          date: fecha,
+          startTime: horaInicio,
+          endTime: horaFin,
+          totalAmount: montoTotalNum,
+          paidAmount: montoPagadoNum,
+        })
+
         navigate('/reservas')
         return
       }
 
       if (tipoReserva === 'UNICA') {
-        // Se reemplaza por POST /api/bookings (US17, RF/US del
-        // Subdominio Bookings) cuando el backend esté conectado
-        // (Sprint 2). Por ahora escribe directo en el fake API.
-        await apiClient.post('/alquileres', { ...basePayload, fecha, tipoReserva: 'UNICA' })
+        const { data: creada } = await apiClient.post('/bookings', {
+          courtId: canchaSeleccionada.id,
+          customerId,
+          customerName: clienteSeleccionado.nombre,
+          type: canchaSeleccionada.deporte,
+          date: fecha,
+          startTime: horaInicio,
+          endTime: horaFin,
+          totalAmount: montoTotalNum,
+        })
+
+        if (montoPagadoNum > 0) {
+          await apiClient.post('/payments', {
+            bookingId: creada.id,
+            amount: Math.min(montoPagadoNum, montoTotalNum),
+            method: metodoPago,
+          })
+        }
+
         navigate('/calendario')
         return
       }
@@ -324,8 +459,7 @@ export default function NuevaReservaPage() {
           ? generarFechasMultidia(fecha, fechaFinMultidia)
           : generarFechasRecurrentes(fecha, repeticiones)
 
-      // Antes de crear nada, se valida que la cancha esté libre en
-      // esa franja horaria para TODAS las fechas de la serie.
+
       const ocupadas = fechas.filter((f) =>
         reservas.some(
           (r) => r.canchaId === canchaSeleccionada.id && r.fecha === f && horaInicio < r.horaFin && horaFin > r.horaInicio,
@@ -337,41 +471,43 @@ export default function NuevaReservaPage() {
         return
       }
 
-      const serieId = generarSerieId()
       const serieEtiqueta =
         tipoReserva === 'MULTIDIA'
           ? `Reserva de ${fechas.length} días seguidos`
           : `Reserva recurrente semanal (${fechas.length} fechas)`
 
-      // No hay endpoint de "series" en el fake API: se crea un
-      // /alquileres por fecha, todos con el mismo serieId, para poder
-      // agruparlos y accionarlos juntos desde Reservas (ver
-      // ReservasPage). Se reemplaza por POST /api/bookings/series
-      // cuando el backend esté conectado (Sprint 2).
-      await Promise.all(
-        fechas.map((f, index) =>
-          apiClient.post('/alquileres', {
-            ...basePayload,
-            fecha: f,
-            tipoReserva,
-            serieId,
-            serieEtiqueta,
-            serieModoPago: modoPagoSerie,
-            serieTotalFechas: fechas.length,
-            serieIndice: index + 1,
-          }),
-        ),
-      )
+      const { data: creadas } = await apiClient.post('/bookings/serie', {
+        courtId: canchaSeleccionada.id,
+        customerId,
+        customerName: clienteSeleccionado.nombre,
+        type: canchaSeleccionada.deporte,
+        dates: fechas,
+        startTime: horaInicio,
+        endTime: horaFin,
+        totalAmount: montoTotalNum,
+        seriesPaymentMode: modoPagoSerie === 'ACUMULADO' ? 'LUMP_SUM' : 'INDIVIDUAL',
+        seriesLabel: serieEtiqueta,
+        bookingType: tipoReserva === 'MULTIDIA' ? 'MULTIDAY' : 'RECURRING',
+      })
+
+      if (montoPagadoNum > 0 && creadas[0]) {
+        await apiClient.post('/payments', {
+          bookingId: creadas[0].id,
+          amount: Math.min(montoPagadoNum, creadas[0].totalAmount),
+          method: 'EFECTIVO',
+        })
+      }
+
       navigate('/calendario')
-    } catch {
-      setError('No se pudo guardar el alquiler. Intenta de nuevo.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'No se pudo guardar la reserva. Intenta de nuevo.'))
     } finally {
       setGuardando(false)
     }
   }
 
-  const tituloDesktop = editando ? 'Editar Alquiler' : 'Registrar Nuevo Alquiler'
-  const tituloDesktopBreadcrumb = editando ? 'Editar Alquiler' : 'Registrar Alquiler'
+  const tituloDesktop = editando ? 'Editar Reserva' : 'Registrar Nueva Reserva'
+  const tituloDesktopBreadcrumb = editando ? 'Editar Reserva' : 'Registrar Reserva'
 
   return (
     <AppShell searchPlaceholder="Buscar reservas o clientes..." minimalMobile>
@@ -382,7 +518,7 @@ export default function NuevaReservaPage() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <h1 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50">
-          {editando ? 'Editar Alquiler' : 'Registrar Alquiler'}
+          {editando ? 'Editar Reserva' : 'Registrar Reserva'}
         </h1>
       </div>
 
@@ -418,8 +554,12 @@ export default function NuevaReservaPage() {
                         : 'border-neutral-200 dark:border-neutral-700'
                     }`}
                   >
-                    <span className="h-14 w-14 rounded-lg bg-gradient-to-br from-brand-primary to-[#1E293B] flex items-center justify-center shrink-0">
-                      <Goal className="h-5 w-5 text-white/70" />
+                    <span className="h-14 w-14 rounded-lg bg-gradient-to-br from-brand-primary to-[#1E293B] flex items-center justify-center shrink-0 overflow-hidden">
+                      {c.fotoUrl ? (
+                        <img src={c.fotoUrl} alt={c.nombre} className="h-full w-full object-cover" />
+                      ) : (
+                        <Goal className="h-5 w-5 text-white/70" />
+                      )}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="font-sans font-semibold text-sm text-neutral-900 dark:text-neutral-50 truncate">
@@ -495,6 +635,7 @@ export default function NuevaReservaPage() {
             <input
               type="date"
               required
+              min={editando ? undefined : hoyISO}
               value={fecha}
               onChange={(e) => setFecha(e.target.value)}
               className="w-full h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
@@ -544,6 +685,8 @@ export default function NuevaReservaPage() {
                   type="time"
                   required
                   value={horaInicio}
+                  min={canchaSeleccionada?.horaApertura}
+                  max={canchaSeleccionada?.horaCierre}
                   onChange={(e) => cambiarHoraInicio(e.target.value)}
                   className="w-full h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
                 />
@@ -556,6 +699,8 @@ export default function NuevaReservaPage() {
                   type="time"
                   required
                   value={horaFin}
+                  min={canchaSeleccionada?.horaApertura}
+                  max={canchaSeleccionada?.horaCierre}
                   onChange={(e) => cambiarHoraFin(e.target.value)}
                   className="w-full h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
                 />
@@ -564,6 +709,11 @@ export default function NuevaReservaPage() {
             <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 mt-2">
               Duración: <span className="font-semibold">{formatDuracion(duracionHoras)}</span>
             </p>
+            {canchaSeleccionada?.horaApertura && canchaSeleccionada?.horaCierre && (
+              <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
+                Esta cancha atiende de {canchaSeleccionada.horaApertura} a {canchaSeleccionada.horaCierre}.
+              </p>
+            )}
 
             {!editando && tipoReserva !== 'UNICA' && (
               <>
@@ -607,6 +757,7 @@ export default function NuevaReservaPage() {
               </div>
               <button
                 type="button"
+                onClick={abrirNuevoCliente}
                 className="font-sans text-sm font-semibold text-brand-primary"
               >
                 + Nuevo
@@ -724,6 +875,31 @@ export default function NuevaReservaPage() {
                 </button>
               ))}
             </div>
+
+            {Number(montoPagado) > 0 && (
+              <>
+                <label className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mb-1 mt-3 block">
+                  Método de Pago
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {METODOS_PAGO.map(({ value, label }) => (
+                    <button
+                      type="button"
+                      key={value}
+                      onClick={() => setMetodoPago(value)}
+                      className={`h-14 rounded-lg border font-sans text-xs font-medium px-1 flex flex-col items-center justify-center gap-1 ${
+                        metodoPago === value
+                          ? 'border-brand-primary text-brand-primary bg-brand-primary/5'
+                          : 'border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300'
+                      }`}
+                    >
+                      <MetodoPagoIcon value={value} className="h-4 w-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {/* 5. Comprobante */}
@@ -767,9 +943,9 @@ export default function NuevaReservaPage() {
             {guardando
               ? 'Guardando...'
               : editando
-                ? 'Actualizar Alquiler'
+                ? 'Actualizar Reserva'
                 : tipoReserva === 'UNICA'
-                  ? 'Guardar Alquiler'
+                  ? 'Guardar Reserva'
                   : `Guardar ${fechasPrevisualizadas.length || ''} Reservas`}
           </button>
         </div>
@@ -827,8 +1003,12 @@ export default function NuevaReservaPage() {
                       : 'border-neutral-200 dark:border-neutral-700 hover:shadow-sm'
                   }`}
                 >
-                  <div className="relative h-28 bg-gradient-to-br from-brand-primary to-[#1E293B] flex items-center justify-center">
-                    <Goal className="h-8 w-8 text-white/70" />
+                  <div className="relative h-28 bg-gradient-to-br from-brand-primary to-[#1E293B] flex items-center justify-center overflow-hidden">
+                    {c.fotoUrl ? (
+                      <img src={c.fotoUrl} alt={c.nombre} className="absolute inset-0 h-full w-full object-cover" />
+                    ) : (
+                      <Goal className="h-8 w-8 text-white/70" />
+                    )}
                     {seleccionada && (
                       <span className="absolute top-2 right-2 h-6 w-6 rounded-full bg-white dark:bg-neutral-800 flex items-center justify-center">
                         <Check className="h-4 w-4 text-brand-primary" />
@@ -914,6 +1094,7 @@ export default function NuevaReservaPage() {
                 <input
                   type="date"
                   required
+                  min={editando ? undefined : hoyISO}
                   value={fecha}
                   onChange={(e) => setFecha(e.target.value)}
                   className="w-full h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
@@ -962,6 +1143,8 @@ export default function NuevaReservaPage() {
                   type="time"
                   required
                   value={horaInicio}
+                  min={canchaSeleccionada?.horaApertura}
+                  max={canchaSeleccionada?.horaCierre}
                   onChange={(e) => cambiarHoraInicio(e.target.value)}
                   className="w-full h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
                 />
@@ -974,6 +1157,8 @@ export default function NuevaReservaPage() {
                   type="time"
                   required
                   value={horaFin}
+                  min={canchaSeleccionada?.horaApertura}
+                  max={canchaSeleccionada?.horaCierre}
                   onChange={(e) => cambiarHoraFin(e.target.value)}
                   className="w-full h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
                 />
@@ -982,6 +1167,11 @@ export default function NuevaReservaPage() {
             <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 mt-2">
               Duración: <span className="font-semibold">{formatDuracion(duracionHoras)}</span>
             </p>
+            {canchaSeleccionada?.horaApertura && canchaSeleccionada?.horaCierre && (
+              <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
+                Esta cancha atiende de {canchaSeleccionada.horaApertura} a {canchaSeleccionada.horaCierre}.
+              </p>
+            )}
 
             {!editando && tipoReserva !== 'UNICA' && (
               <>
@@ -1023,6 +1213,7 @@ export default function NuevaReservaPage() {
               </h2>
               <button
                 type="button"
+                onClick={abrirNuevoCliente}
                 className="flex items-center gap-1.5 h-8 px-3 rounded-full bg-brand-secondary/15 text-brand-primary font-sans text-xs font-semibold hover:bg-brand-secondary/25"
               >
                 <UserPlus className="h-3.5 w-3.5" />
@@ -1149,6 +1340,31 @@ export default function NuevaReservaPage() {
                 </button>
               ))}
             </div>
+
+            {Number(montoPagado) > 0 && (
+              <>
+                <label className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mb-1 mt-4 block">
+                  Método de Pago
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {METODOS_PAGO.map(({ value, label }) => (
+                    <button
+                      type="button"
+                      key={value}
+                      onClick={() => setMetodoPago(value)}
+                      className={`h-16 rounded-lg border font-sans text-xs font-medium px-1 flex flex-col items-center justify-center gap-1 ${
+                        metodoPago === value
+                          ? 'border-brand-primary text-brand-primary bg-brand-secondary/10'
+                          : 'border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50'
+                      }`}
+                    >
+                      <MetodoPagoIcon value={value} className="h-5 w-5" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {/* 5. Comprobante de pago */}
@@ -1203,15 +1419,92 @@ export default function NuevaReservaPage() {
               {guardando
                 ? 'Guardando...'
                 : editando
-                  ? 'Actualizar Alquiler'
+                  ? 'Actualizar Reserva'
                   : tipoReserva === 'UNICA'
-                    ? 'Guardar Alquiler'
+                    ? 'Guardar Reserva'
                     : `Guardar ${fechasPrevisualizadas.length || ''} Reservas`}
             </button>
           </div>
         </div>
         </div>
       </form>
+
+      {/* Modal: registrar cliente nuevo real (POST /customers), para no permitir
+          reservas "a nombre de" alguien que no existe como Customer. */}
+      {modalClienteAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-800 p-6 shadow-lg">
+            <h2 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50 mb-4">
+              Registrar nuevo cliente
+            </h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="font-sans text-sm font-medium text-neutral-700 dark:text-neutral-300 block mb-1">
+                  Nombre completo
+                </label>
+                <input
+                  type="text"
+                  value={nuevoCliente.nombre}
+                  onChange={(e) => setNuevoCliente((c) => ({ ...c, nombre: e.target.value }))}
+                  className="w-full h-11 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-transparent px-3 font-sans text-sm text-neutral-900 dark:text-neutral-50"
+                  placeholder="Ej. Juan Pérez"
+                />
+              </div>
+
+              <div>
+                <label className="font-sans text-sm font-medium text-neutral-700 dark:text-neutral-300 block mb-1">
+                  Teléfono
+                </label>
+                <input
+                  type="tel"
+                  value={nuevoCliente.telefono}
+                  onChange={(e) => setNuevoCliente((c) => ({ ...c, telefono: e.target.value }))}
+                  className="w-full h-11 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-transparent px-3 font-sans text-sm text-neutral-900 dark:text-neutral-50"
+                  placeholder="9XXXXXXXX"
+                />
+              </div>
+
+              <div>
+                <label className="font-sans text-sm font-medium text-neutral-700 dark:text-neutral-300 block mb-1">
+                  DNI (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={nuevoCliente.dni}
+                  onChange={(e) => setNuevoCliente((c) => ({ ...c, dni: e.target.value }))}
+                  className="w-full h-11 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-transparent px-3 font-sans text-sm text-neutral-900 dark:text-neutral-50"
+                  placeholder="Ej. 12345678"
+                />
+              </div>
+
+              {errorNuevoCliente && (
+                <p className="font-sans text-sm text-danger" role="alert">
+                  {errorNuevoCliente}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setModalClienteAbierto(false)}
+                className="h-11 px-5 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={guardandoCliente}
+                onClick={guardarNuevoCliente}
+                className="h-11 px-5 rounded-lg bg-brand-primary text-white font-sans font-semibold text-sm disabled:opacity-60"
+              >
+                {guardandoCliente ? 'Guardando...' : 'Guardar cliente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   )
 }

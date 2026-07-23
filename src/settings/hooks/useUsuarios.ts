@@ -1,26 +1,55 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../shared/api/client'
 
 export interface Usuario {
-  id: string
+  id: number
   nombre: string
   correo: string
   esDueno: boolean
   estado: 'ACTIVO' | 'INACTIVO'
   /** ISO timestamp del último acceso, usado para el "Activo hace Xh". */
   ultimoAcceso?: string
+  fotoUrl?: string
 }
 
-// Cuentas de administrador/personal con acceso otorgado. Se reemplaza
-// por GET /api/users (RF de administración de cuentas) cuando el
-// backend esté conectado (Sprint 2). Por ahora apunta al fake API.
+interface UsuarioApiRow {
+  id: number
+  name: string
+  email: string
+  isOwner: boolean
+  lastAccess?: string | null
+  // Antes el backend no incluía esto en el listado (se pensaba como
+  // "listado liviano"), así que ningún administrador mostraba su foto acá.
+  photoUrl?: string | null
+}
+
 export function useUsuarios() {
   return useQuery({
     queryKey: ['usuarios'],
     queryFn: async () => {
-      const { data } = await apiClient.get<Usuario[]>('/usuarios')
-      return data
+      const { data } = await apiClient.get('/users')
+      return (data as UsuarioApiRow[]).map(
+        (row): Usuario => ({
+          id: row.id,
+          nombre: row.name,
+          correo: row.email,
+          esDueno: row.isOwner,
+          estado: 'ACTIVO',
+          ultimoAcceso: row.lastAccess ?? undefined,
+          fotoUrl: row.photoUrl ?? undefined,
+        }),
+      )
     },
+  })
+}
+
+export function useDesactivarUsuario() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (userId: number) => {
+      await apiClient.delete(`/users/${userId}`)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['usuarios'] }),
   })
 }
 
