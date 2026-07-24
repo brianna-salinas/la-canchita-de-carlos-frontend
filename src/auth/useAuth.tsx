@@ -10,18 +10,18 @@ const INTERVALO_REFRESCO_FOTO_MS = 45 * 60 * 1000;
 
 export interface AuthUser {
   id: number;
-  nombre: string;
-  correo: string;
-  esDueno: boolean;
-  fotoUrl?: string;
-  nombreUsuario?: string;
+  name: string;
+  email: string;
+  isOwner: boolean;
+  photoUrl?: string;
+  username?: string;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
-  login: (usuario: string, password: string) => Promise<void>;
+  login: (usernameOrEmail: string, password: string) => Promise<void>;
   logout: () => void;
-  updateUser: (cambios: Partial<AuthUser>) => void;
+  updateUser: (changes: Partial<AuthUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -53,9 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return leerUsuarioGuardado();
   });
 
-  async function login(usuario: string, password: string) {
+  async function login(usernameOrEmail: string, password: string) {
     const { data } = await apiClient.post("/auth/login", {
-      usernameOrEmail: usuario,
+      usernameOrEmail,
       password,
     });
 
@@ -63,17 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const nuevoUsuario: AuthUser = {
       id: data.user.id,
-      nombre: data.user.name,
-      correo: data.user.email,
-      esDueno: !!data.user.isOwner,
-      // Antes se derivaba del correo (data.user.email.split('@')[0]) porque
-      // el backend nunca mandaba el username real; ya lo manda, así que se
-      // usa directamente.
-      nombreUsuario: data.user.username,
-      // Antes el login nunca devolvia la foto de perfil, asi que tras cada
-      // inicio de sesion se perdia (solo quedaba si ya estaba en localStorage
-      // de una sesion anterior). Ahora el backend la resuelve a signed URL.
-      fotoUrl: data.user.photoUrl ?? undefined,
+      name: data.user.name,
+      email: data.user.email,
+      isOwner: !!data.user.isOwner,
+      username: data.user.username,
+      photoUrl: data.user.photoUrl ?? undefined,
     };
 
     setUser(nuevoUsuario);
@@ -87,10 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     guardarUsuario(null);
   }
 
-  function updateUser(cambios: Partial<AuthUser>) {
+  function updateUser(changes: Partial<AuthUser>) {
     setUser((actual) => {
       if (!actual) return actual;
-      const actualizado = { ...actual, ...cambios };
+      const actualizado = { ...actual, ...changes };
       guardarUsuario(actualizado);
       return actualizado;
     });
@@ -103,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function refrescarFoto() {
       try {
         const { data } = await apiClient.get("/users/me");
-        if (!cancelado) updateUser({ fotoUrl: data.photoUrl ?? undefined });
+        if (!cancelado) updateUser({ photoUrl: data.photoUrl ?? undefined });
       } catch {
         // Si falla (sin red, sesion vencida, etc.) se deja la foto como
         // estaba; el proximo intento programado lo vuelve a resolver.

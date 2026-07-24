@@ -7,17 +7,9 @@ import { getApiErrorMessage } from '../../shared/utils/api-error'
 
 type Estado = 'verificando' | 'exito' | 'error'
 
-// El correo de verificación (ver ResendNotificationSender.ts en el backend)
-// manda un link a "/verificar-correo?token=...", pero esta pantalla no
-// existía en el frontend: el enlace caía en el 404 y no llamaba nunca al
-// endpoint real (GET /users/verificar?token=...), así que el correo nunca
-// terminaba de activar la cuenta.
 export default function VerificarCorreoPage() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
-  // Si no hay token en la URL no hace falta llamar a nada: se sabe desde el
-  // primer render que el enlace está mal formado, así que el estado inicial
-  // ya lo refleja (evita un setState síncrono dentro del efecto).
   const [estado, setEstado] = useState<Estado>(() => (token ? 'verificando' : 'error'))
   const [error, setError] = useState<string | null>(() =>
     token ? null : 'El enlace de verificación no es válido: falta el token.',

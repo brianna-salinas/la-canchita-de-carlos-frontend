@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Wrench, X } from 'lucide-react'
-import { useProgramarMantenimiento } from '../hooks/useCalendario'
-import type { Cancha } from '../hooks/useCalendario'
+import { useScheduleMaintenance } from '../hooks/useCalendario'
+import type { Court } from '../hooks/useCalendario'
 import { toISODate } from '../../shared/utils/date'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
 
@@ -18,8 +18,7 @@ function sumarMeses(fechaISO: string, meses: number): string {
   const diaOriginal = d.getDate()
   d.setDate(1)
   d.setMonth(d.getMonth() + meses)
-  // Si el mes destino tiene menos días (ej. 31 de enero + 1 mes → 28/29 de
-  // febrero), se recorta al último día de ese mes en vez de desbordar a marzo.
+
   const ultimoDiaDelMes = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
   d.setDate(Math.min(diaOriginal, ultimoDiaDelMes))
   return toISODate(d)
@@ -47,7 +46,7 @@ function formatFechaCorta(iso: string): string {
 }
 
 interface ProgramarMantenimientoModalProps {
-  canchas: Cancha[]
+  canchas: Court[]
   /** Preselecciona la cancha (ej. abierto desde la ficha de esa cancha o desde una celda del Calendario). */
   canchaIdInicial?: number
   /** Preselecciona fecha/hora (ej. abierto desde una celda "Libre" del Calendario). */
@@ -79,23 +78,18 @@ export default function ProgramarMantenimientoModal({
   const [motivo, setMotivo] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const programarMantenimiento = useProgramarMantenimiento()
+  const programarMantenimiento = useScheduleMaintenance()
 
   const canchaSeleccionada = canchas.find((c) => c.id === canchaId) ?? null
 
-  // Si cambia la cancha seleccionada y esa cancha tiene horario de atención
-  // configurado, se recorta la hora elegida para que no quede fuera de rango
-  // (mismo criterio que Registrar Reserva). Se ajusta durante el render
-  // (patrón recomendado por React ante cambios de props/estado derivado),
-  // no en un efecto.
   const [canchaIdAnterior, setCanchaIdAnterior] = useState(canchaId)
   if (canchaId !== canchaIdAnterior) {
     setCanchaIdAnterior(canchaId)
-    if (canchaSeleccionada?.horaApertura && horaInicio < canchaSeleccionada.horaApertura) {
-      setHoraInicio(canchaSeleccionada.horaApertura)
+    if (canchaSeleccionada?.openTime && horaInicio < canchaSeleccionada.openTime) {
+      setHoraInicio(canchaSeleccionada.openTime)
     }
-    if (canchaSeleccionada?.horaCierre && horaFin > canchaSeleccionada.horaCierre) {
-      setHoraFin(canchaSeleccionada.horaCierre)
+    if (canchaSeleccionada?.closeTime && horaFin > canchaSeleccionada.closeTime) {
+      setHoraFin(canchaSeleccionada.closeTime)
     }
   }
 
@@ -125,21 +119,21 @@ export default function ProgramarMantenimientoModal({
       return
     }
     if (
-      canchaSeleccionada?.horaApertura &&
-      canchaSeleccionada?.horaCierre &&
-      (horaInicio < canchaSeleccionada.horaApertura || horaFin > canchaSeleccionada.horaCierre)
+      canchaSeleccionada?.openTime &&
+      canchaSeleccionada?.closeTime &&
+      (horaInicio < canchaSeleccionada.openTime || horaFin > canchaSeleccionada.closeTime)
     ) {
-      setError(`Esta cancha solo está disponible de ${canchaSeleccionada.horaApertura} a ${canchaSeleccionada.horaCierre}.`)
+      setError(`Esta cancha solo está disponible de ${canchaSeleccionada.openTime} a ${canchaSeleccionada.closeTime}.`)
       return
     }
 
     try {
       await programarMantenimiento.mutateAsync({
-        canchaId: Number(canchaId),
-        fechas,
-        horaInicio,
-        horaFin,
-        motivo: motivo.trim() || undefined,
+        courtId: Number(canchaId),
+        dates: fechas,
+        startTime: horaInicio,
+        endTime: horaFin,
+        reason: motivo.trim() || undefined,
       })
       onProgramado?.()
       onClose()
@@ -187,7 +181,7 @@ export default function ProgramarMantenimientoModal({
             >
               {canchas.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.nombre}
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -212,8 +206,8 @@ export default function ProgramarMantenimientoModal({
                 type="time"
                 required
                 value={horaInicio}
-                min={canchaSeleccionada?.horaApertura}
-                max={canchaSeleccionada?.horaCierre}
+                min={canchaSeleccionada?.openTime}
+                max={canchaSeleccionada?.closeTime}
                 onChange={(e) => setHoraInicio(e.target.value)}
                 className="w-full h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
               />
@@ -224,16 +218,16 @@ export default function ProgramarMantenimientoModal({
                 type="time"
                 required
                 value={horaFin}
-                min={canchaSeleccionada?.horaApertura}
-                max={canchaSeleccionada?.horaCierre}
+                min={canchaSeleccionada?.openTime}
+                max={canchaSeleccionada?.closeTime}
                 onChange={(e) => setHoraFin(e.target.value)}
                 className="w-full h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
               />
             </div>
           </div>
-          {canchaSeleccionada?.horaApertura && canchaSeleccionada?.horaCierre && (
+          {canchaSeleccionada?.openTime && canchaSeleccionada?.closeTime && (
             <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500 -mt-1">
-              Esta cancha atiende de {canchaSeleccionada.horaApertura} a {canchaSeleccionada.horaCierre}.
+              Esta cancha atiende de {canchaSeleccionada.openTime} a {canchaSeleccionada.closeTime}.
             </p>
           )}
 

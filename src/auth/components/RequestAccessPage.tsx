@@ -13,7 +13,7 @@ import {
 import AuthLayout, { AuthFooter } from './AuthLayout'
 import { requestAccess } from './../api.ts'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
-import { esCorreoValido, esTelefonoValido } from '../../shared/utils/validation'
+import { isValidEmail, isValidPhone } from '../../shared/utils/validation'
 
 export default function RequestAccessPage() {
   const navigate = useNavigate()
@@ -33,11 +33,11 @@ export default function RequestAccessPage() {
       setError('El nombre no puede estar vacío.')
       return
     }
-    if (!esCorreoValido(correo)) {
+    if (!isValidEmail(correo)) {
       setError('El correo no tiene un formato válido.')
       return
     }
-    if (!esTelefonoValido(telefono)) {
+    if (!isValidPhone(telefono)) {
       setError('El teléfono no es válido (debe ser un celular peruano de 9 dígitos).')
       return
     }
@@ -49,7 +49,7 @@ export default function RequestAccessPage() {
     setLoading(true)
     try {
       // US20, Escenario 1: solicitud creada en estado pendiente
-      await requestAccess({ nombre, correo, telefono, password })
+      await requestAccess({ name: nombre, email: correo, phone: telefono, password })
       navigate('/solicitud-enviada')
     } catch (err) {
       // US20, Escenario 2: correo ya registrado (o cualquier otro rechazo

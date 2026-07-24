@@ -15,9 +15,9 @@ import {
   Wrench,
 } from 'lucide-react'
 import AppShell from '../../shared/components/AppShell'
-import { useCanchas, useReservas, useBloqueos, useBloqueosRango, type Cancha } from '../hooks/useCalendario'
+import { useCourts, useBookings, useScheduleBlocks, useScheduleBlocksRange, type Court } from '../hooks/useCalendario'
 import { toISODate, hourToNum, getWeekDates } from '../../shared/utils/date'
-import type { Alquiler } from '../../dashboard/hooks/usePanelData'
+import type { Booking } from '../../dashboard/hooks/usePanelData'
 import ProgramarMantenimientoModal from './ProgramarMantenimientoModal'
 
 const VISTAS = [
@@ -28,14 +28,6 @@ const VISTAS = [
 
 type Vista = (typeof VISTAS)[number]['value']
 
-// Antes cada fila de la grilla solo mostraba la hora de inicio ("21:00"),
-// lo que generaba confusión: con cierre a las 22:00, la última fila
-// reservable ES la de 21:00 (representa la franja 21:00-22:00), pero de un
-// vistazo parecía que el calendario "se cortaba" antes de la hora de
-// cierre real. Mostrar el rango completo de la franja deja esto explícito.
-// Se muestra en dos líneas (en vez de "21:00 - 22:00" en una sola línea)
-// porque esa cadena no entra en el ancho fijo de la columna de horas sin
-// desbordarse hacia la celda de al lado.
 function siguienteHora(hora: string): string {
   const h = hourToNum(hora)
   return `${String((h + 1) % 24).padStart(2, '0')}:00`
@@ -61,27 +53,19 @@ function generateHours(open: string, close: string): string[] {
   return hours.length > 0 ? hours : ['08:00']
 }
 
-// La vista de día antes mostraba siempre 16:00-20:00 fijo, sin importar el
-// horario real de las canchas. Ahora se calcula el rango que cubre a todas
-// las canchas activas (la más temprana en abrir hasta la más tardía en
-// cerrar). El horario de una cancha es opcional: si no lo configuró, esa
-// cancha no tiene restricción y cuenta como "todo el día" (00:00-24:00),
-// así que el rango se expande para incluirla completa.
-function computeHourRange(canchas: Cancha[]): string[] {
+function computeHourRange(canchas: Court[]): string[] {
   if (canchas.length === 0) return generateHours('00:00', '24:00')
   let minOpen = '23:59'
   let maxClose = '00:00'
   for (const c of canchas) {
-    const open = c.horaApertura ?? '00:00'
-    const close = c.horaCierre ?? '24:00'
+    const open = c.openTime ?? '00:00'
+    const close = c.closeTime ?? '24:00'
     if (open < minOpen) minOpen = open
     if (close > maxClose) maxClose = close
   }
   return generateHours(minOpen, maxClose)
 }
 
-// Grilla de 6 semanas x 7 días (lunes a domingo) que cubre el mes completo
-// de `date`, incluyendo días de los meses adyacentes para rellenar la grilla.
 function getMonthGrid(date: Date): Date[][] {
   const year = date.getFullYear()
   const month = date.getMonth()
@@ -110,19 +94,12 @@ type CellState =
   | { tipo: 'fueraDeHorario' }
   | { tipo: 'pasado' }
   | { tipo: 'libre' }
-  | { tipo: 'continuacion'; reserva: Alquiler }
-  | { tipo: 'reserva'; reserva: Alquiler; duracionHoras: number }
+  | { tipo: 'continuacion'; reserva: Booking }
+  | { tipo: 'reserva'; reserva: Booking; duracionHoras: number }
 
-// Antes la grilla del día usaba un solo rango de horas fusionado (la más
-// temprana en abrir hasta la más tardía en cerrar, entre TODAS las
-// canchas), pero mostraba cada celda como "Libre" sin revisar si esa hora
-// caía dentro del horario de ESA cancha en particular. Resultado: si la
-// Cancha 1 abre 8-20 y la Cancha 2 abre 6-22, a las 6am la columna de la
-// Cancha 1 se veía "Libre" (reservable) aunque a esa hora no debería
-// siquiera estar abierta. Esto revisa el horario propio de cada cancha.
-function estaFueraDeHorarioDeLaCancha(cancha: Cancha, hora: string): boolean {
-  const open = cancha.horaApertura
-  const close = cancha.horaCierre
+function estaFueraDeHorarioDeLaCancha(cancha: Court, hora: string): boolean {
+  const open = cancha.openTime
+  const close = cancha.closeTime
   if (!open || !close) return false // sin horario configurado = abierta 24h
   return hora < open || hora >= close
 }
@@ -145,9 +122,6 @@ function Cell({
     )
   }
 
-  // Fuera del horario de atención de ESA cancha en particular (otra cancha
-  // puede seguir abierta a esa misma hora). No es "Libre": no se puede
-  // reservar ahí, así que no lleva botón "+".
   if (estado.tipo === 'fueraDeHorario') {
     return (
       <div className="h-full min-h-14 md:min-h-[76px] rounded-lg bg-neutral-50 dark:bg-neutral-900/60 border border-dashed border-neutral-200 dark:border-neutral-700 flex items-center justify-center text-neutral-300 dark:text-neutral-600">
@@ -156,11 +130,6 @@ function Cell({
     )
   }
 
-  // Un horario ya pasado (fecha anterior a hoy, u hoy pero con la hora ya
-  // transcurrida) no tiene sentido ofrecerlo como reservable: antes se
-  // mostraba igual que "Libre" con su botón "+", lo que permitía intentar
-  // reservar algo que ya pasó (el backend lo termina rechazando, pero la UI
-  // ni siquiera debía dejarlo elegir).
   if (estado.tipo === 'pasado') {
     return (
       <div className="h-full min-h-14 md:min-h-[76px] rounded-lg bg-neutral-100 dark:bg-neutral-700/40 border border-neutral-200 dark:border-neutral-700 flex items-center justify-center text-neutral-400 dark:text-neutral-500">
@@ -207,7 +176,7 @@ function Cell({
   }
 
   if (estado.tipo === 'continuacion') {
-    const pagado = estado.reserva.estadoPago === 'PAGADO'
+    const pagado = estado.reserva.paymentStatus === 'PAID'
     return (
       <div
         className={`h-full min-h-14 md:min-h-[76px] rounded-lg border flex items-center justify-center ${
@@ -220,8 +189,8 @@ function Cell({
   }
 
   const { reserva, duracionHoras } = estado
-  const pagado = reserva.estadoPago === 'PAGADO'
-  const debe = reserva.montoTotal - reserva.montoPagado
+  const pagado = reserva.paymentStatus === 'PAID'
+  const debe = reserva.totalAmount - reserva.paidAmount
 
   return (
     <div
@@ -231,10 +200,10 @@ function Cell({
     >
       <div className="min-w-0">
         <p className="font-sans font-semibold text-xs text-neutral-900 dark:text-neutral-50 leading-tight truncate">
-          {reserva.clienteNombre}
+          {reserva.customerName}
         </p>
         <p className="hidden md:block font-sans text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
-          {reserva.tipo ?? 'Reserva'} - {duracionHoras}hr
+          {reserva.type ?? 'Reserva'} - {duracionHoras}hr
         </p>
       </div>
       <span
@@ -248,20 +217,12 @@ function Cell({
   )
 }
 
-// Antes el calendario arrancaba siempre en una fecha de prueba fija
-// (2026-07-11), sin importar el día real. Ahora sí arranca en "hoy" de
-// verdad, y esta función da una etiqueta relativa (Ayer/Hoy/Mañana...) para
-// que el usuario vea claramente en qué día está el sistema al navegar.
 function diasEntre(a: Date, b: Date): number {
   const utcA = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())
   const utcB = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())
   return Math.round((utcA - utcB) / 86400000)
 }
 
-// Una celda de un día anterior a hoy siempre "ya pasó". Si es hoy, la hora
-// en punto de la celda cuenta como pasada en cuanto llega esa hora (igual de
-// estricto que assertNotInPast en el backend: casi nunca se llega a la
-// franja exactamente en el segundo hh:00:00).
 function esHoraPasada(fechaCelda: Date, hora: string, ahora: Date = new Date()): boolean {
   const diff = diasEntre(fechaCelda, ahora)
   if (diff < 0) return true
@@ -284,13 +245,9 @@ export default function CalendarioPage() {
   const [fecha, setFecha] = useState(() => new Date())
   const [vista, setVista] = useState<Vista>('dia')
 
-  const { data: canchas = [], isLoading: cargandoCanchas } = useCanchas()
-  const { data: reservas = [], isLoading: cargandoReservas } = useReservas()
+  const { data: canchas = [], isLoading: cargandoCanchas } = useCourts()
+  const { data: reservas = [], isLoading: cargandoReservas } = useBookings()
 
-  // Filtro tipo "mis calendarios" de Google Calendar: elegir qué canchas se
-  // muestran en la vista de Día, para no tener que ver todas juntas si solo
-  // te interesa seguir una o dos. Se guarda en localStorage para que la
-  // elección persista entre sesiones, igual que recordaría Google Calendar.
   const [canchasOcultas, setCanchasOcultas] = useState<Set<number>>(() => {
     try {
       const guardado = localStorage.getItem('calendario:canchasOcultas')
@@ -302,10 +259,7 @@ export default function CalendarioPage() {
   const [filtroAbierto, setFiltroAbierto] = useState(false)
   const filtroRef = useRef<HTMLDivElement>(null)
 
-  // Contexto de la celda "Libre" desde la que se abrió "Programar
-  // Mantenimiento" (llave inglesa junto al "+" de Nueva Reserva), para
-  // preseleccionar cancha/fecha/hora en el modal.
-  const [mantenimientoContexto, setMantenimientoContexto] = useState<{ canchaId: number; hora: string } | null>(null)
+  const [mantenimientoContexto, setMantenimientoContexto] = useState<{ courtId: number; time: string } | null>(null)
 
   useEffect(() => {
     localStorage.setItem('calendario:canchasOcultas', JSON.stringify([...canchasOcultas]))
@@ -337,26 +291,18 @@ export default function CalendarioPage() {
 
   const HOURS = useMemo(() => computeHourRange(canchasVisibles), [canchasVisibles])
 
-  // IDs de canchas visibles: antes el filtro "Canchas" solo escondía columnas
-  // en la vista Día, pero Semana y Mes seguían agregando reservas de TODAS
-  // las canchas (incluidas las ocultas) sin revisar el filtro para nada.
-  // Cualquier lista de reservas que se muestre debe pasar por este set.
   const idsVisibles = useMemo(() => new Set(canchasVisibles.map((c) => c.id)), [canchasVisibles])
 
   const isoFecha = toISODate(fecha)
-  const { data: bloqueos = [] } = useBloqueos(isoFecha)
-  const reservasDelDia = reservas.filter((r) => r.fecha === isoFecha && idsVisibles.has(r.canchaId))
-  const bloqueosDelDia = bloqueos.filter((b) => b.fecha === isoFecha && idsVisibles.has(b.canchaId))
+  const { data: bloqueos = [] } = useScheduleBlocks(isoFecha)
+  const reservasDelDia = reservas.filter((r) => r.date === isoFecha && idsVisibles.has(r.courtId))
+  const bloqueosDelDia = bloqueos.filter((b) => b.date === isoFecha && idsVisibles.has(b.courtId))
 
-  // Bloqueos de TODA la semana visible — antes la vista Semana no mostraba
-  // mantenimientos porque solo se pedían los del día seleccionado
-  // (bloqueosDelDia, arriba). Solo se pide cuando la vista Semana está
-  // activa para no hacer estas llamadas de más en Día/Mes.
   const fechasSemana = useMemo(
     () => (vista === 'semana' ? getWeekDates(fecha).map(toISODate) : []),
     [vista, fecha],
   )
-  const { data: bloqueosSemana = [] } = useBloqueosRango(fechasSemana)
+  const { data: bloqueosSemana = [] } = useScheduleBlocksRange(fechasSemana)
 
   const displayDate = useMemo(() => {
     if (vista === 'mes') {
@@ -375,8 +321,6 @@ export default function CalendarioPage() {
       .replace(/^\w/, (c) => c.toUpperCase())
   }, [fecha, vista])
 
-  // Antes solo movía por día. Ahora el paso depende de la vista activa: un
-  // día en vista Día, una semana en vista Semana, un mes en vista Mes.
   function cambiarPeriodo(delta: number) {
     setFecha((prev) => {
       const next = new Date(prev)
@@ -396,28 +340,28 @@ export default function CalendarioPage() {
     setFecha(new Date())
   }
 
-  function getCellState(cancha: Cancha, hora: string): CellState {
+  function getCellState(cancha: Court, hora: string): CellState {
     const bloqueo = bloqueosDelDia.find(
-      (b) => b.canchaId === cancha.id && b.hora === hora,
+      (b) => b.courtId === cancha.id && b.time === hora,
     )
     if (bloqueo) return { tipo: 'bloqueado' }
 
     const reservaInicia = reservasDelDia.find(
-      (r) => r.canchaId === cancha.id && r.horaInicio === hora,
+      (r) => r.courtId === cancha.id && r.startTime === hora,
     )
     if (reservaInicia) {
       return {
         tipo: 'reserva',
         reserva: reservaInicia,
-        duracionHoras: hourToNum(reservaInicia.horaFin) - hourToNum(reservaInicia.horaInicio),
+        duracionHoras: hourToNum(reservaInicia.endTime) - hourToNum(reservaInicia.startTime),
       }
     }
 
     const reservaEnCurso = reservasDelDia.find(
       (r) =>
-        r.canchaId === cancha.id &&
-        hourToNum(r.horaInicio) < hourToNum(hora) &&
-        hourToNum(r.horaFin) > hourToNum(hora),
+        r.courtId === cancha.id &&
+        hourToNum(r.startTime) < hourToNum(hora) &&
+        hourToNum(r.endTime) > hourToNum(hora),
     )
     if (reservaEnCurso) return { tipo: 'continuacion', reserva: reservaEnCurso }
 
@@ -443,16 +387,16 @@ export default function CalendarioPage() {
       ? Math.round((libres / (totalCeldas - bloqueadas)) * 100)
       : 0
 
-  const recaudacionHoy = reservasDelDia.reduce((sum, r) => sum + r.montoPagado, 0)
+  const recaudacionHoy = reservasDelDia.reduce((sum, r) => sum + r.paidAmount, 0)
   const pagosPendientes = reservasDelDia
-    .filter((r) => r.estadoPago !== 'PAGADO')
-    .reduce((sum, r) => sum + (r.montoTotal - r.montoPagado), 0)
+    .filter((r) => r.paymentStatus !== 'PAID')
+    .reduce((sum, r) => sum + (r.totalAmount - r.paidAmount), 0)
 
   let ocupacionPico = '—'
   let maxOcupadas = 0
   for (const h of HOURS) {
     const ocupadas = reservasDelDia.filter(
-      (r) => hourToNum(r.horaInicio) <= hourToNum(h) && hourToNum(r.horaFin) > hourToNum(h),
+      (r) => hourToNum(r.startTime) <= hourToNum(h) && hourToNum(r.endTime) > hourToNum(h),
     ).length
     if (ocupadas > maxOcupadas) {
       maxOcupadas = ocupadas
@@ -552,7 +496,7 @@ export default function CalendarioPage() {
                         {visible && <CheckIcon className="h-3 w-3 text-white" />}
                       </span>
                       <span className="font-sans text-sm text-neutral-700 dark:text-neutral-200 truncate">
-                        {c.nombre}
+                        {c.name}
                       </span>
                     </button>
                   )
@@ -621,9 +565,9 @@ export default function CalendarioPage() {
             {getWeekDates(fecha).map((dia) => {
               const iso = toISODate(dia)
               const reservasDia = reservas.filter(
-                (r) => r.fecha === iso && r.estado !== 'CANCELLED' && idsVisibles.has(r.canchaId),
+                (r) => r.date === iso && r.status !== 'CANCELLED' && idsVisibles.has(r.courtId),
               )
-              const recaudacionDia = reservasDia.reduce((sum, r) => sum + r.montoPagado, 0)
+              const recaudacionDia = reservasDia.reduce((sum, r) => sum + r.paidAmount, 0)
               const esHoyCol = iso === toISODate(new Date())
               const esSeleccionado = iso === isoFecha
               return (
@@ -703,18 +647,18 @@ export default function CalendarioPage() {
                     // bloqueo por mantenimiento no se veía para nada acá
                     // (solo en la vista Día).
                     const bloqueoActivo = bloqueosSemana.some(
-                      (b) => b.fecha === iso && idsVisibles.has(b.canchaId) && b.hora === hora,
+                      (b) => b.date === iso && idsVisibles.has(b.courtId) && b.time === hora,
                     )
                     const reservaActiva = reservas.find(
                       (r) =>
-                        r.fecha === iso &&
-                        r.estado !== 'CANCELLED' &&
-                        idsVisibles.has(r.canchaId) &&
-                        hourToNum(r.horaInicio) <= hourToNum(hora) &&
-                        hourToNum(r.horaFin) > hourToNum(hora),
+                        r.date === iso &&
+                        r.status !== 'CANCELLED' &&
+                        idsVisibles.has(r.courtId) &&
+                        hourToNum(r.startTime) <= hourToNum(hora) &&
+                        hourToNum(r.endTime) > hourToNum(hora),
                     )
                     const esPasado = esHoraPasada(dia, hora)
-                    const pagado = reservaActiva?.estadoPago === 'PAGADO'
+                    const pagado = reservaActiva?.paymentStatus === 'PAID'
 
                     return (
                       <button
@@ -724,7 +668,7 @@ export default function CalendarioPage() {
                           bloqueoActivo
                             ? 'Bloqueado por mantenimiento'
                             : reservaActiva
-                              ? `${reservaActiva.clienteNombre} - ${reservaActiva.canchaNombre} (${reservaActiva.horaInicio}-${reservaActiva.horaFin})`
+                              ? `${reservaActiva.customerName} - ${reservaActiva.courtName} (${reservaActiva.startTime}-${reservaActiva.endTime})`
                               : undefined
                         }
                         className={`p-1 border-l border-neutral-50 dark:border-neutral-700/40 text-left`}
@@ -749,7 +693,7 @@ export default function CalendarioPage() {
                           ) : (
                             reservaActiva && (
                               <span className="font-sans text-[10px] font-semibold text-neutral-700 dark:text-neutral-200 truncate">
-                                {reservaActiva.clienteNombre} - {reservaActiva.canchaNombre}
+                                {reservaActiva.customerName} - {reservaActiva.courtName}
                               </span>
                             )
                           )}
@@ -796,7 +740,7 @@ export default function CalendarioPage() {
               semana.map((dia) => {
                 const iso = toISODate(dia)
                 const reservasDia = reservas.filter(
-                  (r) => r.fecha === iso && r.estado !== 'CANCELLED' && idsVisibles.has(r.canchaId),
+                  (r) => r.date === iso && r.status !== 'CANCELLED' && idsVisibles.has(r.courtId),
                 )
                 const esMesActual = dia.getMonth() === fecha.getMonth()
                 const esHoyCol = iso === toISODate(new Date())
@@ -825,14 +769,14 @@ export default function CalendarioPage() {
                       {visibles.map((r) => (
                         <p
                           key={r.id}
-                          title={`${r.clienteNombre} - ${r.canchaNombre} (${r.horaInicio}-${r.horaFin})`}
+                          title={`${r.customerName} - ${r.courtName} (${r.startTime}-${r.endTime})`}
                           className={`w-full truncate rounded px-1 py-0.5 font-sans text-[9px] md:text-[10px] font-medium ${
-                            r.estadoPago === 'PAGADO'
+                            r.paymentStatus === 'PAID'
                               ? 'bg-success/15 text-success'
                               : 'bg-danger/15 text-danger'
                           }`}
                         >
-                          {r.clienteNombre} - {r.canchaNombre} ({r.horaInicio}-{r.horaFin})
+                          {r.customerName} - {r.courtName} ({r.startTime}-{r.endTime})
                         </p>
                       ))}
                       {restantes > 0 && (
@@ -869,9 +813,9 @@ export default function CalendarioPage() {
                 {canchasVisibles.map((c) => (
                   <div key={c.id} className="px-2 md:px-4 py-3 text-center border-l border-neutral-100 dark:border-neutral-700/60">
                     <p className="font-sans font-semibold text-sm text-brand-primary">
-                      {c.nombre}
+                      {c.name}
                     </p>
-                    <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500">{c.superficie}</p>
+                    <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500">{c.surface}</p>
                   </div>
                 ))}
               </div>
@@ -903,7 +847,7 @@ export default function CalendarioPage() {
                               `/calendario/nueva-reserva?canchaId=${c.id}&fecha=${isoFecha}&horaInicio=${hora}`,
                             )
                           }
-                          onMantenimiento={() => setMantenimientoContexto({ canchaId: c.id, hora })}
+                          onMantenimiento={() => setMantenimientoContexto({ courtId: c.id, time: hora })}
                         />
                       </div>
                     ))}
@@ -1027,9 +971,9 @@ export default function CalendarioPage() {
       {mantenimientoContexto && (
         <ProgramarMantenimientoModal
           canchas={canchasVisibles}
-          canchaIdInicial={mantenimientoContexto.canchaId}
+          canchaIdInicial={mantenimientoContexto.courtId}
           fechaInicial={isoFecha}
-          horaInicial={mantenimientoContexto.hora}
+          horaInicial={mantenimientoContexto.time}
           onClose={() => setMantenimientoContexto(null)}
         />
       )}

@@ -16,12 +16,12 @@ import {
   X,
 } from 'lucide-react'
 import AppShell from '../../shared/components/AppShell'
-import { useClientes, type Cliente } from '../hooks/useClientes'
-import { useReservas } from '../../bookings/hooks/useCalendario'
+import { useCustomers, type Customer } from '../hooks/useClientes'
+import { useBookings } from '../../bookings/hooks/useCalendario'
 import { apiClient } from '../../shared/api/client'
-import { iniciales } from '../../shared/utils/format'
+import { initials } from '../../shared/utils/format'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
-import { esTelefonoValido } from '../../shared/utils/validation'
+import { isValidPhone } from '../../shared/utils/validation'
 
 const PAGE_SIZE = 10
 const UMBRAL_VIP = 10
@@ -40,7 +40,7 @@ function formatTelefono(telefono: string) {
   return telefono
 }
 
-interface ClienteConStats extends Cliente {
+interface ClienteConStats extends Customer {
   totalAlquileres: number
   ultimoAlquiler: string | null
 }
@@ -57,22 +57,22 @@ export default function ClientesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const { data: clientes = [], isLoading, isError } = useClientes()
-  const { data: reservas = [] } = useReservas()
+  const { data: clientes = [], isLoading, isError } = useCustomers()
+  const { data: reservas = [] } = useBookings()
 
   const [busqueda, setBusqueda] = useState('')
   const [pagina, setPagina] = useState(1)
   const [modalAbierto, setModalAbierto] = useState(false)
-  const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null)
+  const [clienteEditando, setClienteEditando] = useState<Customer | null>(null)
   const [form, setForm] = useState<FormState>(FORM_VACIO)
   const [guardando, setGuardando] = useState(false)
   const [errorModal, setErrorModal] = useState<string | null>(null)
 
   const clientesConStats: ClienteConStats[] = useMemo(() => {
     return clientes.map((c) => {
-      const propios = reservas.filter((r) => r.clienteId === c.id)
+      const propios = reservas.filter((r) => r.customerId === c.id)
       const ultimo = propios.reduce<string | null>((max, r) => {
-        if (!max || r.fecha > max) return r.fecha
+        if (!max || r.date > max) return r.date
         return max
       }, null)
       return { ...c, totalAlquileres: propios.length, ultimoAlquiler: ultimo }
@@ -84,9 +84,9 @@ export default function ClientesPage() {
     if (!q) return clientesConStats
     return clientesConStats.filter(
       (c) =>
-        c.nombre.toLowerCase().includes(q) ||
-        c.telefono.includes(q) ||
-        (c.dni ?? '').includes(q),
+        c.name.toLowerCase().includes(q) ||
+        c.phone.includes(q) ||
+        (c.documentNumber ?? '').includes(q),
     )
   }, [clientesConStats, busqueda])
 
@@ -98,7 +98,7 @@ export default function ClientesPage() {
   )
 
   const nuevosSinAlquileres = clientesConStats.filter((c) => c.totalAlquileres === 0).length
-  const activos = clientesConStats.filter((c) => (c.estado ?? 'ACTIVO') === 'ACTIVO').length
+  const activos = clientesConStats.filter((c) => (c.status ?? 'ACTIVE') === 'ACTIVE').length
   const fidelizacion = clientesConStats.length
     ? Math.round((activos / clientesConStats.length) * 100)
     : 0
@@ -111,9 +111,9 @@ export default function ClientesPage() {
     setModalAbierto(true)
   }
 
-  function abrirEditar(c: Cliente) {
+  function abrirEditar(c: Customer) {
     setClienteEditando(c)
-    setForm({ nombre: c.nombre, telefono: c.telefono, dni: c.dni ?? '' })
+    setForm({ nombre: c.name, telefono: c.phone, dni: c.documentNumber ?? '' })
     setErrorModal(null)
     setModalAbierto(true)
   }
@@ -127,7 +127,7 @@ export default function ClientesPage() {
       setErrorModal('El teléfono no puede estar vacío.')
       return
     }
-    if (!esTelefonoValido(form.telefono)) {
+    if (!isValidPhone(form.telefono)) {
       setErrorModal('El teléfono no es válido (debe ser un celular peruano de 9 dígitos).')
       return
     }
@@ -141,7 +141,7 @@ export default function ClientesPage() {
       } else {
         await apiClient.post('/customers', payload)
       }
-      await queryClient.invalidateQueries({ queryKey: ['clientes'] })
+      await queryClient.invalidateQueries({ queryKey: ['customers'] })
       setModalAbierto(false)
     } catch (err) {
       setErrorModal(getApiErrorMessage(err, 'No se pudo guardar el cliente. Intenta de nuevo.'))
@@ -154,14 +154,14 @@ export default function ClientesPage() {
     if (!window.confirm('¿Eliminar este cliente? Esta acción no se puede deshacer.')) return
     try {
       await apiClient.delete(`/customers/${id}`)
-      await queryClient.invalidateQueries({ queryKey: ['clientes'] })
+      await queryClient.invalidateQueries({ queryKey: ['customers'] })
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo eliminar el cliente. Intenta de nuevo.'))
     }
   }
 
-  function verHistorial(c: Cliente) {
-    navigate(`/reservas?cliente=${encodeURIComponent(c.nombre)}`)
+  function verHistorial(c: Customer) {
+    navigate(`/reservas?cliente=${encodeURIComponent(c.name)}`)
   }
 
   return (
@@ -224,26 +224,26 @@ export default function ClientesPage() {
               </tr>
             )}
             {clientesPagina.map((c) => {
-              const activo = (c.estado ?? 'ACTIVO') === 'ACTIVO'
+              const activo = (c.status ?? 'ACTIVE') === 'ACTIVE'
               return (
                 <tr key={c.id} className="border-b border-neutral-50 last:border-0">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      {c.fotoUrl ? (
+                      {c.photoUrl ? (
                         <img
-                          src={c.fotoUrl}
-                          alt={c.nombre}
+                          src={c.photoUrl}
+                          alt={c.name}
                           className="h-9 w-9 rounded-full object-cover shrink-0"
                         />
                       ) : (
                         <span className="h-9 w-9 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-xs font-bold flex items-center justify-center shrink-0">
-                          {iniciales(c.nombre)}
+                          {initials(c.name)}
                         </span>
                       )}
                       <div>
-                        <p className="font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50">{c.nombre}</p>
+                        <p className="font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50">{c.name}</p>
                         <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500">
-                          {c.dni ? `DNI: ${c.dni}` : 'DNI no registrado'}
+                          {c.documentNumber ? `DNI: ${c.documentNumber}` : 'DNI no registrado'}
                         </p>
                       </div>
                     </div>
@@ -251,7 +251,7 @@ export default function ClientesPage() {
                   <td className="px-2 py-4">
                     <span className="flex items-center gap-2 font-sans text-sm text-neutral-600 dark:text-neutral-300">
                       <MessageSquare className="h-4 w-4 text-success" />
-                      {formatTelefono(c.telefono)}
+                      {formatTelefono(c.phone)}
                     </span>
                   </td>
                   <td className="px-2 py-4 font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50">
@@ -405,14 +405,14 @@ export default function ClientesPage() {
 
         <div className="space-y-4 mt-4">
           {clientesFiltrados.map((c) => {
-            const activo = (c.estado ?? 'ACTIVO') === 'ACTIVO'
+            const activo = (c.status ?? 'ACTIVE') === 'ACTIVE'
             return (
               <div key={c.id} className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50">{c.nombre}</p>
+                    <p className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50">{c.name}</p>
                     <p className="font-sans text-sm text-neutral-400 dark:text-neutral-500">
-                      {c.dni ? `DNI: ${c.dni}` : 'DNI no registrado'} · {formatTelefono(c.telefono)}
+                      {c.documentNumber ? `DNI: ${c.documentNumber}` : 'DNI no registrado'} · {formatTelefono(c.phone)}
                     </p>
                   </div>
                   <span

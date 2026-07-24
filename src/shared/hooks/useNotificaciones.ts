@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../api/client'
 
-export interface Notificacion {
+export interface Notification {
   id: number
-  titulo: string
-  descripcion: string
-  hora: string
-  leida: boolean
+  title: string
+  message: string
+  relativeTime: string
+  read: boolean
 }
 
 interface NotificationApiRow {
@@ -17,7 +17,7 @@ interface NotificationApiRow {
   createdAt: string
 }
 
-function formatHoraRelativa(iso: string): string {
+function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const minutos = Math.max(0, Math.round(diffMs / 60000))
   if (minutos < 1) return 'Ahora'
@@ -28,36 +28,31 @@ function formatHoraRelativa(iso: string): string {
   return `Hace ${dias}d`
 }
 
-// La campanita de notificaciones (in-app, entre administradores) antes
-// arrancaba con una lista vacía fija y nunca se conectaba al backend, que sí
-// tiene un módulo funcional (GET/PATCH /notifications) usado para avisar de
-// nuevas reservas, mantenimiento, etc. Se refresca cada minuto para que
-// lleguen avisos de otros administradores sin tener que recargar la página.
-export function useNotificaciones() {
+export function useNotifications() {
   return useQuery({
-    queryKey: ['notificaciones'],
+    queryKey: ['notifications'],
     refetchInterval: 60_000,
     queryFn: async () => {
       const { data } = await apiClient.get('/notifications')
       return (data as NotificationApiRow[]).map(
-        (row): Notificacion => ({
+        (row): Notification => ({
           id: row.id,
-          titulo: row.title,
-          descripcion: row.message ?? '',
-          hora: formatHoraRelativa(row.createdAt),
-          leida: row.read,
+          title: row.title,
+          message: row.message ?? '',
+          relativeTime: formatRelativeTime(row.createdAt),
+          read: row.read,
         }),
       )
     },
   })
 }
 
-export function useMarcarNotificacionLeida() {
+export function useMarkNotificationRead() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (id: number) => {
       await apiClient.patch(`/notifications/${id}/leida`)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notificaciones'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   })
 }

@@ -1,67 +1,88 @@
 @startuml shared-module
-title Módulo: Shared (infraestructura transversal del frontend)
+title Módulo Frontend: Shared (API client, Notificaciones, Componentes base, Utilidades)
 
 skinparam classAttributeIconSize 0
 skinparam packageStyle rectangle
 
 package "shared.api" {
-  class apiClient << (O,#4DBECC) axios instance >> {
+  class apiClient << (S,orange) axios instance >> {
     +baseURL: VITE_API_URL
+    +interceptor: Authorization Bearer
   }
+  class "getToken() / setToken()" as tokenHelpers << (F,orchid) function >> {
+    +getToken(): string?
+    +setToken(token?): void
+  }
+  class queryClient << (S,orange) TanStack QueryClient >>
 
-  class queryClient << (O,#4DBECC) QueryClient instance >> {
-    +staleTime: 30000
-    +refetchOnWindowFocus: false
-  }
+  apiClient ..> tokenHelpers
 }
 
-package "shared.theme" {
-  interface ThemeContextValue {
-    +theme: "light" | "dark"
-    +toggleTheme(): void
+package "shared.hooks (model)" {
+  class Notification {
+    +id: number
+    +title: string
+    +message: string
+    +relativeTime: string
+    +read: boolean
   }
 
-  class "ThemeProvider" as ThemeProvider << (F,orchid) componente >>
-  class "useTheme" as useTheme << (F,orchid) hook >> {
-    +() : ThemeContextValue
+  class NotificationApiRow << (D,lightblue) DTO backend >> {
+    +id: number
+    +title: string
+    +message?: string
+    +read: boolean
+    +createdAt: string
   }
 
-  ThemeProvider ..|> ThemeContextValue : provee
-  useTheme ..> ThemeContextValue : consume
+  class useNotifications << (F,orchid) query >> {
+    +(): UseQueryResult<Notification[]>
+  }
+  class useMarkNotificationRead << (F,orchid) mutation >> {
+    +(id): UseMutationResult<void>
+  }
+
+  useNotifications ..> NotificationApiRow
+  useNotifications ..> Notification
+  useMarkNotificationRead ..> Notification
+  useNotifications ..> apiClient
 }
 
 package "shared.components" {
-  class AppShell << (P,#F08080) layout >>
-  class Sidebar << (P,#F08080) componente >>
-  class ThemeToggle << (P,#F08080) componente >>
-  class ProtectedRoute << (P,#F08080) componente >>
-  class NotFoundPage << (P,#F08080) página >>
+  class AppShell
+  class ProtectedRoute
+  class MetodoPagoIcon {
+    +value: 'EFECTIVO'|'YAPE'|'OTRO'
+    +className?: string
+  }
 
-  AppShell ..> Sidebar : incluye
-  AppShell ..> ThemeToggle : incluye
-  ThemeToggle ..> useTheme : usa
-  ProtectedRoute ..> "auth.useAuth" : usa
+  AppShell ..> useNotifications
+  AppShell ..> useMarkNotificationRead
+  AppShell ..> "auth.useAuth"
+  ProtectedRoute ..> "auth.useAuth"
 }
 
 package "shared.utils" {
-  class "iniciales" as iniciales << (F,orchid) función >>
-  class "formatFecha" as formatFecha << (F,orchid) función >>
+  class "date.ts" as dateUtils << (F,orchid) functions >> {
+    +toISODate(d)
+    +toHHmm(d)
+    +hourToNum(hora)
+    +getWeekDates(d)
+  }
+  class "format.ts" as formatUtils << (F,orchid) functions >> {
+    +initials(name)
+    +formatDate(iso)
+  }
+  class "api-error.ts" as apiErrorUtils << (F,orchid) functions >> {
+    +getApiErrorMessage(err, fallback)
+  }
+  class "validation.ts" as validationUtils << (F,orchid) functions >> {
+    +isValidPhone(phone)
+    +isValidEmail(email)
+    +isValidPrice(value)
+  }
+
+  apiErrorUtils ..> apiClient
 }
-
-note bottom of ProtectedRoute
-  Envuelve todas las pantallas autenticadas
-  (Panel, Calendario, Reservas, Clientes, Canchas,
-  Ajustes). Si no hay sesión (ni en memoria ni
-  restaurada de localStorage) redirige a /login.
-  Se reemplaza por verificación real de JWT/cookie
-  cuando el backend esté conectado (Sprint 2).
-end note
-
-note bottom of queryClient
-  Cliente único de React Query para toda la app:
-  hoy trae datos de json-server (fake API), y sin
-  cambiar la forma en que las pantallas piden datos
-  pasará a traer del backend real en Sprint 2.
-end note
 
 @enduml

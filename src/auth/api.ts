@@ -1,17 +1,17 @@
 import { apiClient } from '../shared/api/client'
 
 interface RequestAccessPayload {
-  nombre: string
-  correo: string
-  telefono: string
+  name: string
+  email: string
+  phone: string
   password: string
 }
 
 export async function requestAccess(payload: RequestAccessPayload) {
   return apiClient.post('/users/solicitudes', {
-    name: payload.nombre,
-    email: payload.correo,
-    phone: payload.telefono,
+    name: payload.name,
+    email: payload.email,
+    phone: payload.phone,
     password: payload.password,
   })
 }

@@ -18,9 +18,9 @@ import {
   Landmark,
 } from 'lucide-react'
 import AppShell from '../../shared/components/AppShell'
-import { useCanchas, useReservas } from '../hooks/useCalendario'
+import { useCourts, useBookings } from '../hooks/useCalendario'
 import { apiClient } from '../../shared/api/client'
-import { iniciales, formatFecha } from '../../shared/utils/format'
+import { initials, formatDate } from '../../shared/utils/format'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
 import MetodoPagoIcon from '../../shared/components/MetodoPagoIcon'
 
@@ -28,33 +28,36 @@ const FECHA_DEMO = '2026-07-11'
 
 type MetodoPago = 'EFECTIVO' | 'YAPE' | 'OTRO'
 
-// Antes esto no se preguntaba nunca: todo pago confirmado desde acá
-// (individual o de una serie completa) se registraba siempre como
-// "EFECTIVO", sin importar cómo pagó el cliente en realidad.
 const METODOS_PAGO: { value: MetodoPago; label: string }[] = [
   { value: 'EFECTIVO', label: 'Efectivo' },
   { value: 'YAPE', label: 'Yape / Plin' },
   { value: 'OTRO', label: 'Otro (tarjeta, etc.)' },
 ]
 
-type PagoPendiente = { tipo: 'individual' } | { tipo: 'serie'; serieId: string }
+type PagoPendiente = { tipo: 'individual' } | { tipo: 'serie'; seriesId: string }
 
 const ESTADO_BADGE: Record<string, string> = {
-  PAGADO: 'bg-success text-white',
-  PARCIAL: 'bg-warning text-white',
-  PENDIENTE: 'bg-danger text-white',
+  PAID: 'bg-success text-white',
+  PARTIAL: 'bg-warning text-white',
+  PENDING: 'bg-danger text-white',
 }
 
 const ESTADO_BADGE_SUAVE: Record<string, string> = {
-  PAGADO: 'bg-success/15 text-success',
-  PARCIAL: 'bg-warning/15 text-warning',
-  PENDIENTE: 'bg-danger/15 text-danger',
+  PAID: 'bg-success/15 text-success',
+  PARTIAL: 'bg-warning/15 text-warning',
+  PENDING: 'bg-danger/15 text-danger',
 }
 
 const ESTADO_ICONO: Record<string, typeof CircleCheck> = {
-  PAGADO: CircleCheck,
-  PARCIAL: Wallet,
-  PENDIENTE: Clock,
+  PAID: CircleCheck,
+  PARTIAL: Wallet,
+  PENDING: Clock,
+}
+
+const ESTADO_PAGO_LABEL: Record<string, string> = {
+  PAID: 'PAGADO',
+  PARTIAL: 'PARCIAL',
+  PENDING: 'PENDIENTE',
 }
 
 export default function ReservasPage() {
@@ -62,8 +65,8 @@ export default function ReservasPage() {
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
 
-  const { data: canchas = [] } = useCanchas()
-  const { data: reservas = [], isLoading, isError } = useReservas()
+  const { data: canchas = [] } = useCourts()
+  const { data: reservas = [], isLoading, isError } = useBookings()
 
   const [fechaInicio, setFechaInicio] = useState('')
   const [fechaFin, setFechaFin] = useState('')
@@ -108,7 +111,7 @@ export default function ReservasPage() {
       label: 'Pendientes',
       apply: () => {
         limpiarFiltros()
-        setEstadoFiltro('PENDIENTE')
+        setEstadoFiltro('PENDING')
       },
     },
     {
@@ -121,7 +124,7 @@ export default function ReservasPage() {
     },
     ...canchas.map((c) => ({
       id: `cancha-${c.id}`,
-      label: c.nombre,
+      label: c.name,
       apply: () => {
         limpiarFiltros()
         setCanchaFiltro(String(c.id))
@@ -137,46 +140,46 @@ export default function ReservasPage() {
   const reservasFiltradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     return reservas.filter((r) => {
-      if (fechaInicio && r.fecha < fechaInicio) return false
-      if (fechaFin && r.fecha > fechaFin) return false
-      if (canchaFiltro && String(r.canchaId) !== canchaFiltro) return false
-      if (estadoFiltro && r.estadoPago !== estadoFiltro) return false
-      if (soloSeries && !r.serieId) return false
+      if (fechaInicio && r.date < fechaInicio) return false
+      if (fechaFin && r.date > fechaFin) return false
+      if (canchaFiltro && String(r.courtId) !== canchaFiltro) return false
+      if (estadoFiltro && r.paymentStatus !== estadoFiltro) return false
+      if (soloSeries && !r.seriesId) return false
       if (q) {
         const idTexto = `res-${String(r.id).padStart(3, '0')}`
         const coincide =
-          idTexto.includes(q) || r.clienteNombre.toLowerCase().includes(q)
+          idTexto.includes(q) || r.customerName.toLowerCase().includes(q)
         if (!coincide) return false
       }
       return true
     })
   }, [reservas, fechaInicio, fechaFin, canchaFiltro, estadoFiltro, soloSeries, busqueda])
 
-  function pendientesDeSerie(serieId: string) {
-    return reservas.filter((r) => r.serieId === serieId && r.estadoPago !== 'PAGADO').length
+  function pendientesDeSerie(seriesId: string) {
+    return reservas.filter((r) => r.seriesId === seriesId && r.paymentStatus !== 'PAID').length
   }
 
-  function marcarSeriePagada(serieId: string) {
+  function marcarSeriePagada(seriesId: string) {
     if (!window.confirm('¿Marcar todas las fechas pendientes de esta serie como pagadas?')) return
-    setPagoPendiente({ tipo: 'serie', serieId })
+    setPagoPendiente({ tipo: 'serie', seriesId })
   }
 
-  async function ejecutarMarcarSeriePagada(serieId: string, metodo: MetodoPago) {
-    setMarcandoSerie(serieId)
+  async function ejecutarMarcarSeriePagada(seriesId: string, metodo: MetodoPago) {
+    setMarcandoSerie(seriesId)
     try {
-      const fechasDeLaSerie = reservas.filter((r) => r.serieId === serieId && r.estadoPago !== 'PAGADO')
+      const fechasDeLaSerie = reservas.filter((r) => r.seriesId === seriesId && r.paymentStatus !== 'PAID')
       await Promise.all(
         fechasDeLaSerie
-          .filter((r) => r.montoTotal - r.montoPagado > 0)
+          .filter((r) => r.totalAmount - r.paidAmount > 0)
           .map((r) =>
             apiClient.post('/payments', {
               bookingId: r.id,
-              amount: r.montoTotal - r.montoPagado,
+              amount: r.totalAmount - r.paidAmount,
               method: metodo,
             }),
           ),
       )
-      await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
+      await queryClient.invalidateQueries({ queryKey: ['bookings'] })
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo marcar la serie como pagada. Intenta de nuevo.'))
     } finally {
@@ -193,11 +196,8 @@ export default function ReservasPage() {
     })
   }
 
-  // Una reserva ya "Pagado" no tiene nada más que confirmar, así que no se
-  // puede seleccionar para "Confirmar Pago" (antes se podía marcar igual,
-  // aunque el botón no tuviera ningún efecto real sobre ella).
   const reservasSeleccionables = useMemo(
-    () => reservasFiltradas.filter((r) => r.estadoPago !== 'PAGADO'),
+    () => reservasFiltradas.filter((r) => r.paymentStatus !== 'PAID'),
     [reservasFiltradas],
   )
 
@@ -220,15 +220,15 @@ export default function ReservasPage() {
       await Promise.all(
         [...seleccionadas].map((id) => {
           const r = reservas.find((x) => x.id === id)
-          if (!r || r.montoTotal - r.montoPagado <= 0) return Promise.resolve()
+          if (!r || r.totalAmount - r.paidAmount <= 0) return Promise.resolve()
           return apiClient.post('/payments', {
             bookingId: id,
-            amount: r.montoTotal - r.montoPagado,
+            amount: r.totalAmount - r.paidAmount,
             method: metodo,
           })
         }),
       )
-      await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
+      await queryClient.invalidateQueries({ queryKey: ['bookings'] })
       setSeleccionadas(new Set())
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo confirmar el pago. Intenta de nuevo.'))
@@ -242,7 +242,7 @@ export default function ReservasPage() {
     setProcesandoPago(true)
     try {
       if (pagoPendiente.tipo === 'serie') {
-        await ejecutarMarcarSeriePagada(pagoPendiente.serieId, metodo)
+        await ejecutarMarcarSeriePagada(pagoPendiente.seriesId, metodo)
       } else {
         await ejecutarConfirmarPago(metodo)
       }
@@ -258,7 +258,7 @@ export default function ReservasPage() {
     }
     try {
       await apiClient.post(`/bookings/${id}/cancelar`)
-      await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
+      await queryClient.invalidateQueries({ queryKey: ['bookings'] })
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo cancelar la reserva. Intenta de nuevo.'))
     }
@@ -391,9 +391,9 @@ export default function ReservasPage() {
                 <input
                   type="checkbox"
                   checked={seleccionada}
-                  disabled={r.estadoPago === 'PAGADO'}
+                  disabled={r.paymentStatus === 'PAID'}
                   onChange={() => toggleSeleccion(r.id)}
-                  title={r.estadoPago === 'PAGADO' ? 'Esta reserva ya está pagada' : undefined}
+                  title={r.paymentStatus === 'PAID' ? 'Esta reserva ya está pagada' : undefined}
                   className="h-4 w-4 mt-1 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary shrink-0 disabled:opacity-40"
                 />
                 <div className="flex-1 min-w-0">
@@ -402,49 +402,49 @@ export default function ReservasPage() {
                       #RES-{String(r.id).padStart(3, '0')}
                     </p>
                     <span
-                      className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-sans text-[11px] font-bold uppercase ${ESTADO_BADGE_SUAVE[r.estadoPago]}`}
+                      className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-sans text-[11px] font-bold uppercase ${ESTADO_BADGE_SUAVE[r.paymentStatus]}`}
                     >
-                      {r.estadoPago === 'PAGADO' ? '✓ Pagado' : r.estadoPago === 'PARCIAL' ? 'Parcial' : '! Pendiente'}
+                      {r.paymentStatus === 'PAID' ? '✓ Pagado' : r.paymentStatus === 'PARTIAL' ? 'Parcial' : '! Pendiente'}
                     </span>
                   </div>
                   <p className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50 mt-0.5 truncate">
-                    {r.clienteNombre}
+                    {r.customerName}
                   </p>
 
                   <div className="flex items-center gap-4 mt-2">
                     <span className="flex items-center gap-1.5 font-sans text-sm text-neutral-500 dark:text-neutral-400">
                       <Goal className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
-                      {r.canchaNombre}
+                      {r.courtName}
                     </span>
                     <span className="flex items-center gap-1.5 font-sans text-sm text-neutral-500 dark:text-neutral-400">
                       <CalendarDays className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
-                      {formatFecha(r.fecha)}, {r.horaInicio}
+                      {formatDate(r.date)}, {r.startTime}
                     </span>
                   </div>
 
-                  {r.serieId && (
+                  {r.seriesId && (
                     <div className="mt-2">
                       <span
-                        title={r.serieEtiqueta}
+                        title={r.seriesLabel}
                         className="inline-flex items-center gap-1.5 rounded-full bg-brand-secondary/15 text-brand-primary px-2.5 py-1 font-sans text-[11px] font-semibold"
                       >
                         <Repeat className="h-3 w-3" />
-                        {r.serieIndice ?? '?'}/{r.serieTotalFechas ?? '?'} · {r.tipoReserva === 'RECURRENTE' ? 'Recurrente' : 'Serie'}
+                        {r.seriesIndex ?? '?'}/{r.seriesTotalDates ?? '?'} · {r.bookingType === 'RECURRING' ? 'Recurrente' : 'Serie'}
                       </span>
                     </div>
                   )}
 
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700/60">
                     <p className="font-sans text-sm text-neutral-500 dark:text-neutral-400">
-                      Total: <span className="font-bold text-brand-primary">S/{r.montoTotal}</span>
+                      Total: <span className="font-bold text-brand-primary">S/{r.totalAmount}</span>
                     </p>
                     <div className="flex items-center gap-3">
-                      {r.serieId && pendientesDeSerie(r.serieId) > 0 && (
+                      {r.seriesId && pendientesDeSerie(r.seriesId) > 0 && (
                         <button
-                          onClick={() => marcarSeriePagada(r.serieId as string)}
-                          disabled={marcandoSerie === r.serieId}
+                          onClick={() => marcarSeriePagada(r.seriesId as string)}
+                          disabled={marcandoSerie === r.seriesId}
                           aria-label="Marcar serie como pagada"
-                          title={`Marcar ${pendientesDeSerie(r.serieId)} fecha(s) pendiente(s) de la serie como pagadas`}
+                          title={`Marcar ${pendientesDeSerie(r.seriesId)} fecha(s) pendiente(s) de la serie como pagadas`}
                           className="text-neutral-400 dark:text-neutral-500 hover:text-success disabled:opacity-50"
                         >
                           <Landmark className="h-4 w-4" />
@@ -564,7 +564,7 @@ export default function ReservasPage() {
             <option value="">Todas las canchas</option>
             {canchas.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.nombre}
+                {c.name}
               </option>
             ))}
           </select>
@@ -579,9 +579,9 @@ export default function ReservasPage() {
             className="h-11 px-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50"
           >
             <option value="">Todos los estados</option>
-            <option value="PAGADO">Pagado</option>
-            <option value="PARCIAL">Parcial</option>
-            <option value="PENDIENTE">Pendiente</option>
+            <option value="PAID">Pagado</option>
+            <option value="PARTIAL">Parcial</option>
+            <option value="PENDING">Pendiente</option>
           </select>
         </div>
         <button
@@ -642,16 +642,16 @@ export default function ReservasPage() {
               </tr>
             )}
             {reservasFiltradas.map((r) => {
-              const Icon = ESTADO_ICONO[r.estadoPago]
+              const Icon = ESTADO_ICONO[r.paymentStatus]
               return (
                 <tr key={r.id} className="border-b border-neutral-50 last:border-0">
                   <td className="px-5 py-4">
                     <input
                       type="checkbox"
                       checked={seleccionadas.has(r.id)}
-                      disabled={r.estadoPago === 'PAGADO'}
+                      disabled={r.paymentStatus === 'PAID'}
                       onChange={() => toggleSeleccion(r.id)}
-                      title={r.estadoPago === 'PAGADO' ? 'Esta reserva ya está pagada' : undefined}
+                      title={r.paymentStatus === 'PAID' ? 'Esta reserva ya está pagada' : undefined}
                       className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600 accent-brand-primary disabled:opacity-40"
                     />
                   </td>
@@ -661,50 +661,50 @@ export default function ReservasPage() {
                   <td className="px-2 py-4">
                     <div className="flex items-center gap-2">
                       <span className="h-8 w-8 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-xs font-bold flex items-center justify-center shrink-0">
-                        {iniciales(r.clienteNombre)}
+                        {initials(r.customerName)}
                       </span>
                       <span className="font-sans text-sm font-medium text-neutral-900 dark:text-neutral-50">
-                        {r.clienteNombre}
+                        {r.customerName}
                       </span>
                     </div>
                   </td>
                   <td className="px-2 py-4 font-sans text-sm text-neutral-700 dark:text-neutral-200">
-                    {r.canchaNombre}
+                    {r.courtName}
                   </td>
                   <td className="px-2 py-4">
-                    <p className="font-sans text-sm text-neutral-700 dark:text-neutral-200">{formatFecha(r.fecha)}</p>
+                    <p className="font-sans text-sm text-neutral-700 dark:text-neutral-200">{formatDate(r.date)}</p>
                     <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500">
-                      {r.horaInicio} - {r.horaFin}
+                      {r.startTime} - {r.endTime}
                     </p>
-                    {r.serieId && (
+                    {r.seriesId && (
                       <span
-                        title={r.serieEtiqueta}
+                        title={r.seriesLabel}
                         className="inline-flex items-center gap-1 mt-1 rounded-full bg-brand-secondary/15 text-brand-primary px-2 py-0.5 font-sans text-[10px] font-semibold"
                       >
                         <Repeat className="h-2.5 w-2.5" />
-                        {r.serieIndice ?? '?'}/{r.serieTotalFechas ?? '?'}
+                        {r.seriesIndex ?? '?'}/{r.seriesTotalDates ?? '?'}
                       </span>
                     )}
                   </td>
                   <td className="px-2 py-4 font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50">
-                    S/ {r.montoTotal}
+                    S/ {r.totalAmount}
                   </td>
                   <td className="px-2 py-4">
                     <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-sans text-[11px] font-bold uppercase ${ESTADO_BADGE[r.estadoPago]}`}
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-sans text-[11px] font-bold uppercase ${ESTADO_BADGE[r.paymentStatus]}`}
                     >
                       <Icon className="h-3 w-3" />
-                      {r.estadoPago}
+                      {ESTADO_PAGO_LABEL[r.paymentStatus]}
                     </span>
                   </td>
                   <td className="px-2 py-4">
                     <div className="flex items-center justify-end gap-3 pr-3">
-                      {r.serieId && pendientesDeSerie(r.serieId) > 0 && (
+                      {r.seriesId && pendientesDeSerie(r.seriesId) > 0 && (
                         <button
-                          onClick={() => marcarSeriePagada(r.serieId as string)}
-                          disabled={marcandoSerie === r.serieId}
+                          onClick={() => marcarSeriePagada(r.seriesId as string)}
+                          disabled={marcandoSerie === r.seriesId}
                           aria-label="Marcar serie como pagada"
-                          title={`Marcar ${pendientesDeSerie(r.serieId)} fecha(s) pendiente(s) de la serie como pagadas`}
+                          title={`Marcar ${pendientesDeSerie(r.seriesId)} fecha(s) pendiente(s) de la serie como pagadas`}
                           className="text-neutral-400 dark:text-neutral-500 hover:text-success disabled:opacity-50"
                         >
                           <Landmark className="h-4 w-4" />

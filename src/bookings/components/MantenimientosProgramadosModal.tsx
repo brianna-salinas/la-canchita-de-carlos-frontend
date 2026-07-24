@@ -1,46 +1,42 @@
 import { useState } from 'react'
 import { Wrench, X, Plus, Trash2 } from 'lucide-react'
 import {
-  useMantenimientosProgramados,
-  useCancelarMantenimiento,
-  type BloqueMantenimiento,
+  useUpcomingMaintenance,
+  useCancelMaintenanceBlock,
+  type MaintenanceBlock,
 } from '../hooks/useCalendario'
 import { hourToNum } from '../../shared/utils/date'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
 
-// Un mantenimiento "de 11 a 13h" en realidad son 2 filas (una por hora) en
-// la base de datos; para mostrarlo y cancelarlo como una sola cosa se
-// agrupan por fecha+motivo, mostrando el rango completo y guardando los ids
-// de todas las filas que hay que borrar si se cancela.
 interface GrupoMantenimiento {
-  fecha: string
-  motivo: string
+  date: string
+  reason: string
   horaInicio: string
   horaFin: string
   ids: number[]
 }
 
-function agrupar(bloques: BloqueMantenimiento[]): GrupoMantenimiento[] {
+function agrupar(bloques: MaintenanceBlock[]): GrupoMantenimiento[] {
   const porFechaYMotivo = new Map<string, GrupoMantenimiento>()
   for (const b of bloques) {
-    const clave = `${b.fecha}__${b.motivo}`
+    const clave = `${b.date}__${b.reason}`
     const existente = porFechaYMotivo.get(clave)
     if (existente) {
       existente.ids.push(b.id)
-      if (b.hora < existente.horaInicio) existente.horaInicio = b.hora
-      if (b.hora >= existente.horaFin) existente.horaFin = `${String((hourToNum(b.hora) + 1) % 24).padStart(2, '0')}:00`
+      if (b.time < existente.horaInicio) existente.horaInicio = b.time
+      if (b.time >= existente.horaFin) existente.horaFin = `${String((hourToNum(b.time) + 1) % 24).padStart(2, '0')}:00`
     } else {
       porFechaYMotivo.set(clave, {
-        fecha: b.fecha,
-        motivo: b.motivo,
-        horaInicio: b.hora,
-        horaFin: `${String((hourToNum(b.hora) + 1) % 24).padStart(2, '0')}:00`,
+        date: b.date,
+        reason: b.reason,
+        horaInicio: b.time,
+        horaFin: `${String((hourToNum(b.time) + 1) % 24).padStart(2, '0')}:00`,
         ids: [b.id],
       })
     }
   }
   return Array.from(porFechaYMotivo.values()).sort(
-    (a, c) => a.fecha.localeCompare(c.fecha) || a.horaInicio.localeCompare(c.horaInicio),
+    (a, c) => a.date.localeCompare(c.date) || a.horaInicio.localeCompare(c.horaInicio),
   )
 }
 
@@ -63,16 +59,16 @@ export default function MantenimientosProgramadosModal({
   onClose,
   onProgramarNuevo,
 }: MantenimientosProgramadosModalProps) {
-  const { data: bloques = [], isLoading } = useMantenimientosProgramados(canchaId)
-  const cancelar = useCancelarMantenimiento()
+  const { data: bloques = [], isLoading } = useUpcomingMaintenance(canchaId)
+  const cancelar = useCancelMaintenanceBlock()
   const [cancelandoClave, setCancelandoClave] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const grupos = agrupar(bloques)
 
   async function cancelarGrupo(g: GrupoMantenimiento) {
-    if (!window.confirm(`¿Cancelar el mantenimiento del ${formatFechaLarga(g.fecha)} (${g.horaInicio} a ${g.horaFin})?`)) return
-    const clave = `${g.fecha}__${g.motivo}`
+    if (!window.confirm(`¿Cancelar el mantenimiento del ${formatFechaLarga(g.date)} (${g.horaInicio} a ${g.horaFin})?`)) return
+    const clave = `${g.date}__${g.reason}`
     setCancelandoClave(clave)
     setError(null)
     try {
@@ -126,7 +122,7 @@ export default function MantenimientosProgramadosModal({
 
         <div className="space-y-2 mb-4">
           {grupos.map((g) => {
-            const clave = `${g.fecha}__${g.motivo}`
+            const clave = `${g.date}__${g.reason}`
             return (
               <div
                 key={clave}
@@ -134,10 +130,10 @@ export default function MantenimientosProgramadosModal({
               >
                 <div className="min-w-0 flex-1">
                   <p className="font-sans font-semibold text-sm text-neutral-900 dark:text-neutral-50">
-                    {formatFechaLarga(g.fecha)} · {g.horaInicio} a {g.horaFin}
+                    {formatFechaLarga(g.date)} · {g.horaInicio} a {g.horaFin}
                   </p>
-                  {g.motivo && (
-                    <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">{g.motivo}</p>
+                  {g.reason && (
+                    <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">{g.reason}</p>
                   )}
                 </div>
                 <button

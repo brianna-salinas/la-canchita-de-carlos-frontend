@@ -52,7 +52,7 @@ export default function Sidebar() {
       </div>
 
       <p className="font-sans text-xs tracking-wide text-neutral-400 uppercase px-6 mb-2">
-        {user?.esDueno ? 'Administrador Principal' : 'Administrador'}
+        {user?.isOwner ? 'Administrador Principal' : 'Administrador'}
       </p>
 
       <nav className="flex-1 px-3 mt-2 space-y-1">

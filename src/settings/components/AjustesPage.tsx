@@ -15,11 +15,11 @@ import {
 } from 'lucide-react'
 import AppShell from '../../shared/components/AppShell'
 import { useAuth } from '../../auth/useAuth'
-import { useSolicitudes, useAprobarSolicitud, useRechazarSolicitud } from '../hooks/useSolicitudes'
+import { useAccessRequests, useApproveAccessRequest, useRejectAccessRequest } from '../hooks/useSolicitudes'
 import { apiClient } from '../../shared/api/client'
-import { iniciales } from '../../shared/utils/format'
+import { initials } from '../../shared/utils/format'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
-import { esCorreoValido } from '../../shared/utils/validation'
+import { isValidEmail } from '../../shared/utils/validation'
 
 type Modo = null | 'perfil' | 'usuario' | 'correo' | 'password'
 
@@ -27,15 +27,15 @@ export default function AjustesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, logout, updateUser } = useAuth()
-  const { data: solicitudes = [] } = useSolicitudes()
-  const aprobar = useAprobarSolicitud()
-  const rechazar = useRechazarSolicitud()
+  const { data: solicitudes = [] } = useAccessRequests()
+  const aprobar = useApproveAccessRequest()
+  const rechazar = useRejectAccessRequest()
   const fotoInputRef = useRef<HTMLInputElement>(null)
 
-  const pendientes = solicitudes.filter((s) => s.estado === 'PENDIENTE')
-  const nombre = user?.nombre ?? 'Carlos Maldonado'
-  const correo = user?.correo ?? 'carlos@lacanchita.com'
-  const nombreUsuario = user?.nombreUsuario ?? correo.split('@')[0]
+  const pendientes = solicitudes.filter((s) => s.status === 'PENDING')
+  const nombre = user?.name ?? 'Carlos Maldonado'
+  const correo = user?.email ?? 'carlos@lacanchita.com'
+  const nombreUsuario = user?.username ?? correo.split('@')[0]
 
   const [modo, setModo] = useState<Modo>(null)
   const [formPerfil, setFormPerfil] = useState({ nombre, nombreUsuario, correo })
@@ -64,7 +64,7 @@ export default function AjustesPage() {
       setError('Completa todos los campos.')
       return
     }
-    if (!esCorreoValido(formPerfil.correo)) {
+    if (!isValidEmail(formPerfil.correo)) {
       setError('El correo no tiene un formato válido.')
       return
     }
@@ -81,11 +81,11 @@ export default function AjustesPage() {
         await apiClient.patch('/users/me/correo', { email: formPerfil.correo.trim() })
       }
       updateUser({
-        nombre: formPerfil.nombre.trim(),
-        nombreUsuario: formPerfil.nombreUsuario.trim(),
-        correo: formPerfil.correo.trim(),
+        name: formPerfil.nombre.trim(),
+        username: formPerfil.nombreUsuario.trim(),
+        email: formPerfil.correo.trim(),
       })
-      await queryClient.invalidateQueries({ queryKey: ['usuarios'] })
+      await queryClient.invalidateQueries({ queryKey: ['adminUsers'] })
       setModo(null)
     } catch (err) {
       setError(getApiErrorMessage(err, 'No se pudo guardar. Intenta de nuevo.'))
@@ -131,8 +131,8 @@ export default function AjustesPage() {
     apiClient
       .post(`/users/${user.id}/foto`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
       .then(({ data }) => {
-        updateUser({ fotoUrl: data.photoUrl ?? undefined })
-        return queryClient.invalidateQueries({ queryKey: ['usuarios'] })
+        updateUser({ photoUrl: data.photoUrl ?? undefined })
+        return queryClient.invalidateQueries({ queryKey: ['adminUsers'] })
       })
       .catch((err) => {
         window.alert(getApiErrorMessage(err, 'No se pudo subir la foto. Intenta de nuevo.'))
@@ -184,11 +184,11 @@ export default function AjustesPage() {
 
         <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-4">
           <div className="flex flex-col items-center gap-1.5 shrink-0">
-            {user?.fotoUrl ? (
-              <img src={user.fotoUrl} alt={nombre} className="h-14 w-14 rounded-full object-cover" />
+            {user?.photoUrl ? (
+              <img src={user.photoUrl} alt={nombre} className="h-14 w-14 rounded-full object-cover" />
             ) : (
               <span className="h-14 w-14 rounded-full bg-brand-primary text-white font-sans font-bold text-lg flex items-center justify-center">
-                {iniciales(nombre)}
+                {initials(nombre)}
               </span>
             )}
             <button
@@ -256,7 +256,7 @@ export default function AjustesPage() {
               solicitudes es una accion que el backend ya protege con
               requireOwner, pero antes el boton se mostraba a cualquier
               administrador y les daba un 403 al tocarlo. */}
-          {user?.esDueno && (
+          {user?.isOwner && (
             <button
               onClick={() => navigate('/ajustes/solicitudes')}
               className="w-full bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3"
@@ -313,11 +313,11 @@ export default function AjustesPage() {
         <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden grid grid-cols-1 sm:grid-cols-[220px_1fr]">
           <div className="bg-neutral-50 dark:bg-neutral-900 flex flex-col items-center justify-center gap-3 p-8 border-b sm:border-b-0 sm:border-r border-neutral-100 dark:border-neutral-700/60">
             <div className="relative">
-              {user?.fotoUrl ? (
-                <img src={user.fotoUrl} alt={nombre} className="h-24 w-24 rounded-full object-cover" />
+              {user?.photoUrl ? (
+                <img src={user.photoUrl} alt={nombre} className="h-24 w-24 rounded-full object-cover" />
               ) : (
                 <span className="h-24 w-24 rounded-full bg-brand-primary text-white font-sans font-bold text-3xl flex items-center justify-center">
-                  {iniciales(nombre)}
+                  {initials(nombre)}
                 </span>
               )}
               <button
@@ -401,7 +401,7 @@ export default function AjustesPage() {
           se mostraba a cualquier administrador aunque el backend ya
           bloquea GET/PATCH de solicitudes con requireOwner, asi que un
           admin no-dueño solo se topaba con un 403 al entrar. */}
-      {user?.esDueno && (
+      {user?.isOwner && (
       <div className="hidden md:block bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 mt-5">
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 dark:border-neutral-700/60">
           <div className="flex items-center gap-2">
@@ -435,9 +435,9 @@ export default function AjustesPage() {
                   <div key={s.id} className="border border-neutral-200 dark:border-neutral-700 rounded-xl p-4">
                     <div className="flex items-center gap-3 mb-4">
                       <span className="h-10 w-10 rounded-full bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 font-sans text-sm font-bold flex items-center justify-center shrink-0">
-                        {iniciales(s.nombre)}
+                        {initials(s.name)}
                       </span>
-                      <p className="font-sans font-semibold text-sm text-neutral-900 dark:text-neutral-50">{s.nombre}</p>
+                      <p className="font-sans font-semibold text-sm text-neutral-900 dark:text-neutral-50">{s.name}</p>
                     </div>
                     <div className="flex gap-2">
                       <button

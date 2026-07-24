@@ -2,22 +2,22 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../shared/api/client'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
 
-export interface Solicitud {
+export interface AccessRequest {
   id: number
-  nombre: string
-  correo: string
+  name: string
+  email: string
   /** ISO timestamp de cuándo se envió la solicitud. */
-  creadoEn: string
-  estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'
+  createdAt: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
 }
 
-export function formatFechaLarga(iso: string) {
+export function formatLongDate(iso: string) {
   return new Date(iso)
     .toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
     .replace('.', '')
 }
 
-export function formatFechaRelativa(iso: string) {
+export function formatRelativeDate(iso: string) {
   const fecha = new Date(iso)
   const hora = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true })
   const hoy = new Date()
@@ -28,43 +28,43 @@ export function formatFechaRelativa(iso: string) {
 
   if (mismodia(fecha, hoy)) return `Hoy, ${hora}`
   if (mismodia(fecha, ayer)) return `Ayer, ${hora}`
-  return formatFechaLarga(iso)
+  return formatLongDate(iso)
 }
 
-interface SolicitudApiRow {
+interface AccessRequestApiRow {
   id: number
   name: string
   email: string
   createdAt: string
 }
 
-export function useSolicitudes() {
+export function useAccessRequests() {
   return useQuery({
-    queryKey: ['solicitudes'],
+    queryKey: ['accessRequests'],
     queryFn: async () => {
       const { data } = await apiClient.get('/users/solicitudes')
-      return (data as SolicitudApiRow[]).map(
-        (row): Solicitud => ({
+      return (data as AccessRequestApiRow[]).map(
+        (row): AccessRequest => ({
           id: row.id,
-          nombre: row.name,
-          correo: row.email,
-          creadoEn: row.createdAt,
-          estado: 'PENDIENTE',
+          name: row.name,
+          email: row.email,
+          createdAt: row.createdAt,
+          status: 'PENDING',
         }),
       )
     },
   })
 }
 
-export function useAprobarSolicitud() {
+export function useApproveAccessRequest() {
   const queryClient = useQueryClient()
-  return async (solicitud: Solicitud) => {
+  return async (request: AccessRequest) => {
     try {
 
-      await apiClient.patch(`/users/solicitudes/${solicitud.id}/autorizar`)
+      await apiClient.patch(`/users/solicitudes/${request.id}/autorizar`)
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['solicitudes'] }),
-        queryClient.invalidateQueries({ queryKey: ['usuarios'] }),
+        queryClient.invalidateQueries({ queryKey: ['accessRequests'] }),
+        queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
       ])
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo aprobar la solicitud. Intenta de nuevo.'))
@@ -72,12 +72,12 @@ export function useAprobarSolicitud() {
   }
 }
 
-export function useRechazarSolicitud() {
+export function useRejectAccessRequest() {
   const queryClient = useQueryClient()
   return async (id: number) => {
     try {
       await apiClient.patch(`/users/solicitudes/${id}/rechazar`)
-      await queryClient.invalidateQueries({ queryKey: ['solicitudes'] })
+      await queryClient.invalidateQueries({ queryKey: ['accessRequests'] })
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo rechazar la solicitud. Intenta de nuevo.'))
     }

@@ -1,69 +1,55 @@
 @startuml auth-module
-title Módulo: Auth (frontend)
+title Módulo Frontend: Auth (Sesión, Login, Verificación)
 
 skinparam classAttributeIconSize 0
 skinparam packageStyle rectangle
 
-package "auth" {
-  interface AuthUser {
-    +id: string
-    +nombre: string
-    +correo: string
-    +esDueno: boolean
-    +fotoUrl?: string
-    +nombreUsuario?: string
+package "auth (model & context)" {
+  class AuthUser {
+    +id: number
+    +name: string
+    +email: string
+    +isOwner: boolean
+    +photoUrl?: string
+    +username?: string
   }
 
   interface AuthContextValue {
-    +user: AuthUser | null
-    +login(usuario, password): Promise<void>
+    +user: AuthUser?
+    +login(usernameOrEmail, password): Promise<void>
     +logout(): void
-    +updateUser(cambios): void
-    +verifyPassword(password): Promise<boolean>
+    +updateUser(changes): void
   }
 
-  class "AuthProvider" as AuthProvider << (F,orchid) componente >> {
-    -user: AuthUser | null
-    +login(usuario, password)
-    +logout()
-    +updateUser(cambios)
-    +verifyPassword(password)
+  class AuthProvider << (C,lightgreen) React Context Provider >> {
+    +login(usernameOrEmail, password): Promise<void>
+    +logout(): void
+    +updateUser(changes): void
+    -refrescarFoto(): Promise<void>
   }
 
-  class "useAuth" as useAuth << (F,orchid) hook >> {
-    +() : AuthContextValue
-  }
+  class "useAuth()" as useAuth << (F,orchid) hook >>
 
-  interface RequestAccessPayload {
-    +nombre: string
-    +correo: string
-    +telefono: string
-    +password: string
-  }
-
-  class "requestAccess" as requestAccess << (F,orchid) función >> {
-    +(payload: RequestAccessPayload): Promise
-  }
-
-  AuthProvider ..> AuthUser : gestiona
-  AuthProvider ..|> AuthContextValue : provee
-  useAuth ..> AuthContextValue : consume
-  requestAccess ..> RequestAccessPayload : usa
+  AuthProvider ..|> AuthContextValue
+  AuthProvider --> AuthUser
+  useAuth ..> AuthContextValue
+  AuthProvider ..> "shared.api.client"
 }
 
-package "shared.api" {
-  class apiClient << (O,#4DBECC) axios instance >>
+package "auth.components" {
+  class LoginPage
+  class ForgotPasswordPage
+  class RequestAccessPage
+  class AuthLayout
+  class VerificarCorreoPage
+
+  LoginPage ..> useAuth
+  RequestAccessPage ..> "shared.api.client"
+  ForgotPasswordPage ..> "shared.api.client"
+  VerificarCorreoPage ..> "shared.api.client"
+  LoginPage --> AuthLayout
+  ForgotPasswordPage --> AuthLayout
+  RequestAccessPage --> AuthLayout
 }
-
-AuthProvider --> apiClient : usa
-requestAccess --> apiClient : usa
-
-note bottom of AuthProvider
-  Fase de fake API (Sprint 1): valida contra
-  json-server (db.json) y persiste la sesión
-  en localStorage. Se reemplaza por JWT +
-  POST /api/auth/login del backend real
-  en Sprint 2.
-end note
 
 @enduml

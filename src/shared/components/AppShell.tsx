@@ -12,7 +12,7 @@ import {
   User,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { useNotificaciones, useMarcarNotificacionLeida, type Notificacion } from '../hooks/useNotificaciones'
+import { useNotifications, useMarkNotificationRead, type Notification } from '../hooks/useNotificaciones'
 import Sidebar from './Sidebar'
 import ThemeToggle from './ThemeToggle'
 
@@ -22,7 +22,7 @@ function NotificationsPanel({
   onMarcarTodasLeidas,
   onClose,
 }: {
-  notificaciones: Notificacion[]
+  notificaciones: Notification[]
   align: 'left' | 'right'
   onMarcarTodasLeidas: () => void
   onClose: () => void
@@ -60,21 +60,21 @@ function NotificationsPanel({
           {notificaciones.map((n) => (
             <div
               key={n.id}
-              className={`flex gap-3 px-4 py-3 ${!n.leida ? 'bg-brand-secondary/5 dark:bg-brand-secondary/10' : ''}`}
+              className={`flex gap-3 px-4 py-3 ${!n.read ? 'bg-brand-secondary/5 dark:bg-brand-secondary/10' : ''}`}
             >
               <span
                 className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${
-                  !n.leida ? 'bg-brand-primary' : 'bg-transparent'
+                  !n.read ? 'bg-brand-primary' : 'bg-transparent'
                 }`}
               />
               <div className="min-w-0">
                 <p className="font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50">
-                  {n.titulo}
+                  {n.title}
                 </p>
                 <p className="font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
-                  {n.descripcion}
+                  {n.message}
                 </p>
-                <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-1">{n.hora}</p>
+                <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-1">{n.relativeTime}</p>
               </div>
             </div>
           ))}
@@ -127,11 +127,6 @@ const MOBILE_NAV_ITEMS = [
 interface AppShellProps {
   searchPlaceholder?: string
   showSearch?: boolean
-  // Antes este input no tenía value/onChange: se veía pero no filtraba nada
-  // en ninguna pantalla (Reservas, Clientes). Si la pantalla pasa estas
-  // props, el buscador queda controlado y realmente filtra; si no las pasa,
-  // sigue siendo un input suelto (sin efecto) para las pantallas que no lo
-  // necesitan.
   searchValue?: string
   onSearchChange?: (value: string) => void
   mobileHero?: ReactNode
@@ -156,13 +151,13 @@ export default function AppShell({
   children,
 }: AppShellProps) {
   const { user } = useAuth()
-  const { data: notificaciones = [] } = useNotificaciones()
-  const marcarLeida = useMarcarNotificacionLeida()
+  const { data: notificaciones = [] } = useNotifications()
+  const marcarLeida = useMarkNotificationRead()
   const [notifOpen, setNotifOpen] = useState(false)
-  const hayNoLeidas = notificaciones.some((n) => !n.leida)
+  const hayNoLeidas = notificaciones.some((n) => !n.read)
 
   function marcarTodasLeidas() {
-    notificaciones.filter((n) => !n.leida).forEach((n) => marcarLeida.mutate(n.id))
+    notificaciones.filter((n) => !n.read).forEach((n) => marcarLeida.mutate(n.id))
   }
 
   return (
@@ -212,13 +207,13 @@ export default function AppShell({
                 <div className="flex items-center gap-2">
                   <div className="text-right">
                     <p className="font-sans text-sm font-semibold leading-none">
-                      {user?.nombreUsuario ?? 'carlitos_admin'}
+                      {user?.username ?? 'carlitos_admin'}
                     </p>
                     <p className="font-sans text-xs text-neutral-400 mt-0.5">
-                      {user?.esDueno ? 'Administrador Principal' : 'Administrador'}
+                      {user?.isOwner ? 'Administrador Principal' : 'Administrador'}
                     </p>
                   </div>
-                  <UserAvatar fotoUrl={user?.fotoUrl} />
+                  <UserAvatar fotoUrl={user?.photoUrl} />
                 </div>
               </div>
             </div>
@@ -284,7 +279,7 @@ export default function AppShell({
                 >
                   <HelpCircle className="h-5 w-5" />
                 </a>
-                <UserAvatar fotoUrl={user?.fotoUrl} size="h-8 w-8" />
+                <UserAvatar fotoUrl={user?.photoUrl} size="h-8 w-8" />
               </div>
             </div>
           </header>
@@ -341,13 +336,13 @@ export default function AppShell({
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50 leading-none">
-                  {user?.nombreUsuario ?? 'carlitos_admin'}
+                  {user?.username ?? 'carlitos_admin'}
                 </p>
                 <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                  {user?.esDueno ? 'Administrador Principal' : 'Administrador'}
+                  {user?.isOwner ? 'Administrador Principal' : 'Administrador'}
                 </p>
               </div>
-              <UserAvatar fotoUrl={user?.fotoUrl} />
+              <UserAvatar fotoUrl={user?.photoUrl} />
             </div>
           </div>
         </header>

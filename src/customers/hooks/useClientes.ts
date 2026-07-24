@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../shared/api/client'
 
-export interface Cliente {
+export interface Customer {
   id: number
-  nombre: string
-  telefono: string
-  dni?: string
-  estado?: 'ACTIVO' | 'INACTIVO'
-  fotoUrl?: string
+  name: string
+  phone: string
+  documentNumber?: string
+  status?: 'ACTIVE' | 'INACTIVE'
+  photoUrl?: string
 }
 
 interface CustomerApiRow {
@@ -19,23 +19,23 @@ interface CustomerApiRow {
   photoUrl?: string | null
 }
 
-function mapCustomerToCliente(row: CustomerApiRow): Cliente {
+function mapCustomerRow(row: CustomerApiRow): Customer {
   return {
     id: row.id,
-    nombre: row.name,
-    telefono: row.phone,
-    dni: row.documentNumber ?? undefined,
-    estado: row.status === 'INACTIVE' ? 'INACTIVO' : 'ACTIVO',
-    fotoUrl: row.photoUrl ?? undefined,
+    name: row.name,
+    phone: row.phone,
+    documentNumber: row.documentNumber ?? undefined,
+    status: row.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
+    photoUrl: row.photoUrl ?? undefined,
   }
 }
 
-export function useClientes() {
+export function useCustomers() {
   return useQuery({
-    queryKey: ['clientes'],
+    queryKey: ['customers'],
     queryFn: async () => {
       const { data } = await apiClient.get('/customers')
-      return (data as CustomerApiRow[]).map(mapCustomerToCliente)
+      return (data as CustomerApiRow[]).map(mapCustomerRow)
     },
   })
 }

@@ -3,14 +3,11 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ImagePlus, Info, Settings, Wallet, Save, CircleCheck } from 'lucide-react'
 import AppShell from '../../shared/components/AppShell'
-import { useTodasLasCanchas } from '../../bookings/hooks/useCalendario'
+import { useAllCourts } from '../../bookings/hooks/useCalendario'
 import { apiClient } from '../../shared/api/client'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
-import { esPrecioValido } from '../../shared/utils/validation'
+import { isValidPrice } from '../../shared/utils/validation'
 
-// El negocio solo maneja estos 4 tipos de cancha (antes había una lista
-// genérica de deportes tipo "Fútbol 5/7/11", "Tenis Single", "Pádel", que no
-// aplican a este negocio en particular).
 const DEPORTES = ['Fútbol', 'Vóley', 'Básquet', 'Multiuso']
 
 type EstadoOperativo = 'ACTIVA' | 'MANTENIMIENTO'
@@ -23,8 +20,6 @@ interface FormState {
   estado: EstadoOperativo
   habilitada: boolean
   fotoUrl: string
-  // El horario de atención es opcional: si horarioConfigurado es false, la
-  // cancha queda disponible las 24 horas (sin restricción de franja).
   horarioConfigurado: boolean
   horaApertura: string
   horaCierre: string
@@ -49,34 +44,29 @@ export default function NuevaCanchaPage() {
   const { id } = useParams<{ id: string }>()
   const editando = Boolean(id)
 
-  const { data: canchas = [] } = useTodasLasCanchas()
+  const { data: canchas = [] } = useAllCourts()
 
   const [form, setForm] = useState<FormState>(FORM_VACIO)
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [fotoArchivo, setFotoArchivo] = useState<File | null>(null)
 
-  // Sincroniza el formulario con la cancha real una vez que `canchas`
-  // (fuente externa asíncrona) llega. Es el caso legítimo de "sincronizar
-  // con un sistema externo" que documenta React para useEffect, así que se
-  // silencia puntualmente la regla que asume que todo setState en un
-  // efecto podría evitarse derivándolo en el render.
   useEffect(() => {
     if (!editando || !id) return
     const cancha = canchas.find((c) => String(c.id) === id)
     if (cancha) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({
-        nombre: cancha.nombre,
-        deporte: cancha.deporte,
-        descripcion: cancha.descripcion ?? '',
-        precioHora: String(cancha.precioHora ?? ''),
-        estado: cancha.estado ?? 'ACTIVA',
-        habilitada: cancha.habilitada ?? true,
-        fotoUrl: cancha.fotoUrl ?? '',
-        horarioConfigurado: Boolean(cancha.horaApertura && cancha.horaCierre),
-        horaApertura: cancha.horaApertura ?? '08:00',
-        horaCierre: cancha.horaCierre ?? '22:00',
+        nombre: cancha.name,
+        deporte: cancha.sport,
+        descripcion: cancha.description ?? '',
+        precioHora: String(cancha.pricePerHour ?? ''),
+        estado: cancha.status === 'MAINTENANCE' ? 'MANTENIMIENTO' : 'ACTIVA',
+        habilitada: cancha.enabled ?? true,
+        fotoUrl: cancha.photoUrl ?? '',
+        horarioConfigurado: Boolean(cancha.openTime && cancha.closeTime),
+        horaApertura: cancha.openTime ?? '08:00',
+        horaCierre: cancha.closeTime ?? '22:00',
       })
     }
   }, [editando, id, canchas])
@@ -100,7 +90,7 @@ export default function NuevaCanchaPage() {
       setError('Selecciona el tipo de deporte.')
       return
     }
-    if (!esPrecioValido(form.precioHora)) {
+    if (!isValidPrice(form.precioHora)) {
       setError('El precio por hora debe ser un número mayor a cero.')
       return
     }
@@ -116,11 +106,7 @@ export default function NuevaCanchaPage() {
       const closeTime = form.horarioConfigurado ? form.horaCierre : null
 
       if (editando && canchaId) {
-        // OJO: el toggle "Habilitada para reservas" pausa/reanuda la cancha
-        // (PATCH enabled), nunca la borra. "Eliminar" (en Canchas) es una
-        // acción aparte, irreversible, que sí hace DELETE real. Antes este
-        // toggle llamaba por error a DELETE al desactivarse, lo que borraba
-        // la cancha para siempre con solo desmarcar la casilla al editar.
+
         await apiClient.patch(`/courts/${canchaId}`, {
           name: form.nombre.trim(),
           sport: form.deporte,
@@ -160,7 +146,7 @@ export default function NuevaCanchaPage() {
         })
       }
 
-      await queryClient.invalidateQueries({ queryKey: ['canchas'] })
+      await queryClient.invalidateQueries({ queryKey: ['courts'] })
       navigate('/canchas')
     } catch (err) {
       setError(getApiErrorMessage(err, 'No se pudo guardar la cancha. Intenta de nuevo.'))

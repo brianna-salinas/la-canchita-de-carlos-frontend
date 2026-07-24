@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Plus, Pencil, Trash2, Goal, CircleCheck, Wrench, RotateCcw, TriangleAlert, X, Clock, Info } from 'lucide-react'
 import AppShell from '../../shared/components/AppShell'
-import { useTodasLasCanchas, useReservas } from '../../bookings/hooks/useCalendario'
+import { useAllCourts, useBookings } from '../../bookings/hooks/useCalendario'
 import { apiClient } from '../../shared/api/client'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
 import { toISODate } from '../../shared/utils/date'
@@ -16,9 +16,6 @@ const HORA_CIERRE = 23
 const PAGE_SIZE = 6
 
 function deporteIcono() {
-  // Un solo icono genérico de cancha por ahora (Goal, ya usado en el
-  // nav). Se puede diferenciar por deporte más adelante si se agrega
-  // un set de iconos deportivos específico.
   return Goal
 }
 
@@ -42,37 +39,14 @@ function duracionHoras(horaInicio: string, horaFin: string) {
 export default function CanchasPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-
-  // Antes esta pantalla usaba useCanchas() (el mismo hook de Calendario/Nueva
-  // Reserva, que solo trae canchas habilitadas). Eso significaba que una
-  // cancha pausada (enabled=false, pero no eliminada) desaparecía de esta
-  // lista y no habia forma de reactivarla desde la UI. Ahora usa el listado
-  // completo (incluye pausadas) para poder verlas y reactivarlas. Nota:
-  // "Eliminar" ahora es un borrado real e irreversible (la fila desaparece
-  // de la base de datos, junto con sus reservas y bloqueos); "pausar" (el
-  // toggle "Habilitada para reservas" del formulario) es reversible.
-  const { data: canchas = [], isLoading, isError } = useTodasLasCanchas()
-  const { data: reservas = [] } = useReservas()
+  const { data: canchas = [], isLoading, isError } = useAllCourts()
+  const { data: reservas = [] } = useBookings()
 
   const [visibles, setVisibles] = useState(PAGE_SIZE)
-  // Cancha para la que se está mostrando la advertencia de borrado
-  // permanente (null = ningún modal abierto). Antes esto era un simple
-  // window.confirm con texto largo, fácil de leer en diagonal y aceptar
-  // sin darse cuenta de que se borra todo en cascada; ahora es un modal
-  // explícito con la lista de lo que se pierde.
-  const [canchaAEliminar, setCanchaAEliminar] = useState<{ id: number; nombre: string } | null>(null)
+  const [canchaAEliminar, setCanchaAEliminar] = useState<{ id: number; name: string } | null>(null)
   const [eliminando, setEliminando] = useState(false)
-
-  // Cancha para la que se está mostrando el detalle (nombre, deporte,
-  // precio, horario de atención, etc.) al hacer click en su tarjeta.
   const [canchaDetalle, setCanchaDetalle] = useState<(typeof canchasConDatos)[number] | null>(null)
-
-  // Cancha para la que se está viendo/gestionando mantenimiento (null =
-  // modal cerrado). Se abre desde el botón de llave inglesa en cada
-  // tarjeta: primero muestra los mantenimientos ya programados (con opción
-  // de cancelarlos), y desde ahí se puede abrir el formulario para
-  // programar uno nuevo.
-  const [canchaMantenimiento, setCanchaMantenimiento] = useState<{ id: number; nombre: string } | null>(null)
+  const [canchaMantenimiento, setCanchaMantenimiento] = useState<{ id: number; name: string } | null>(null)
   const [programandoNuevo, setProgramandoNuevo] = useState(false)
 
   const isoHoy = toISODate(new Date())
@@ -80,10 +54,10 @@ export default function CanchasPage() {
   const canchasConDatos = useMemo(() => {
     return canchas.map((c) => {
       const reservasHoy = reservas
-        .filter((r) => r.canchaId === c.id && r.fecha === isoHoy)
-        .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
+        .filter((r) => r.courtId === c.id && r.date === isoHoy)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime))
       const horasOcupadas = reservasHoy.reduce(
-        (acc, r) => acc + duracionHoras(r.horaInicio, r.horaFin),
+        (acc, r) => acc + duracionHoras(r.startTime, r.endTime),
         0,
       )
       const ocupacionPct = Math.round(
@@ -94,15 +68,9 @@ export default function CanchasPage() {
   }, [canchas, reservas, isoHoy])
 
   const total = canchasConDatos.length
-  const activas = canchasConDatos.filter((c) => c.habilitada !== false && (c.estado ?? 'ACTIVA') === 'ACTIVA').length
-  const mantenimiento = canchasConDatos.filter((c) => c.habilitada !== false && c.estado === 'MANTENIMIENTO').length
-
-  // Borrado real e irreversible: borra la cancha y, en cascada, todas sus
-  // reservas, bloqueos de horario y pagos asociados. No hay forma de
-  // deshacer esto (a diferencia de "pausar", que sí es reversible). Antes
-  // esto era un window.confirm con un párrafo largo, muy fácil de aceptar
-  // sin leerlo del todo; ahora abre un modal con la advertencia explícita.
-  function pedirConfirmacionEliminar(c: { id: number; nombre: string }) {
+  const activas = canchasConDatos.filter((c) => c.enabled !== false && (c.status ?? 'ACTIVE') === 'ACTIVE').length
+  const mantenimiento = canchasConDatos.filter((c) => c.enabled !== false && c.status === 'MAINTENANCE').length
+  function pedirConfirmacionEliminar(c: { id: number; name: string }) {
     setCanchaAEliminar(c)
   }
 
@@ -111,7 +79,7 @@ export default function CanchasPage() {
     setEliminando(true)
     try {
       await apiClient.delete(`/courts/${canchaAEliminar.id}`)
-      await queryClient.invalidateQueries({ queryKey: ['canchas'] })
+      await queryClient.invalidateQueries({ queryKey: ['courts'] })
       setCanchaAEliminar(null)
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo eliminar la cancha. Intenta de nuevo.'))
@@ -124,15 +92,15 @@ export default function CanchasPage() {
     if (!window.confirm('¿Reactivar esta cancha? Volverá a estar disponible para reservas.')) return
     try {
       await apiClient.patch(`/courts/${id}`, { enabled: true })
-      await queryClient.invalidateQueries({ queryKey: ['canchas'] })
+      await queryClient.invalidateQueries({ queryKey: ['courts'] })
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo reactivar la cancha. Intenta de nuevo.'))
     }
   }
 
   function CardCancha({ c }: { c: (typeof canchasConDatos)[number] }) {
-    const enMantenimiento = c.estado === 'MANTENIMIENTO'
-    const pausada = c.habilitada === false
+    const enMantenimiento = c.status === 'MAINTENANCE'
+    const pausada = c.enabled === false
     const Icon = deporteIcono()
     return (
       <div
@@ -143,8 +111,8 @@ export default function CanchasPage() {
         className={`text-left bg-white dark:bg-neutral-800 rounded-2xl border overflow-hidden cursor-pointer hover:shadow-sm transition-shadow ${pausada ? 'border-neutral-200 dark:border-neutral-700 opacity-60' : 'border-neutral-200 dark:border-neutral-700'}`}
       >
         <div className={`relative h-36 bg-gradient-to-br ${gradientePorId(c.id)} flex items-center justify-center`}>
-          {c.fotoUrl ? (
-            <img src={c.fotoUrl} alt={c.nombre} className="absolute inset-0 h-full w-full object-cover" />
+          {c.photoUrl ? (
+            <img src={c.photoUrl} alt={c.name} className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <Icon className="h-10 w-10 text-white/70" />
           )}
@@ -159,15 +127,15 @@ export default function CanchasPage() {
 
         <div className="p-4">
           <div className="flex items-start justify-between gap-2">
-            <p className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50">{c.nombre}</p>
+            <p className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50">{c.name}</p>
             <p className="font-sans font-bold text-brand-primary whitespace-nowrap">
-              S/{c.precioHora.toFixed(2)}
+              S/{c.pricePerHour.toFixed(2)}
               <span className="font-sans font-normal text-xs text-neutral-400 dark:text-neutral-500"> /hora</span>
             </p>
           </div>
           <p className="flex items-center gap-1.5 font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-1">
             <Icon className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" />
-            {c.deporte}
+            {c.sport}
           </p>
 
           <div className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700/60 flex items-center justify-between">
@@ -184,7 +152,7 @@ export default function CanchasPage() {
                     key={r.id}
                     className="h-7 px-2 rounded-full bg-neutral-100 dark:bg-neutral-700/60 text-neutral-600 dark:text-neutral-300 font-sans text-xs font-semibold flex items-center justify-center"
                   >
-                    {r.horaInicio.slice(0, 2)}h
+                    {r.startTime.slice(0, 2)}h
                   </span>
                 ))}
                 {c.reservasHoy.length > 2 && (
@@ -221,7 +189,7 @@ export default function CanchasPage() {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  setCanchaMantenimiento({ id: c.id, nombre: c.nombre })
+                  setCanchaMantenimiento({ id: c.id, name: c.name })
                 }}
                 aria-label="Programar mantenimiento"
                 className="text-neutral-400 dark:text-neutral-500 hover:text-warning"
@@ -231,7 +199,7 @@ export default function CanchasPage() {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  pedirConfirmacionEliminar({ id: c.id, nombre: c.nombre })
+                  pedirConfirmacionEliminar({ id: c.id, name: c.name })
                 }}
                 aria-label="Eliminar cancha permanentemente"
                 className="text-neutral-400 dark:text-neutral-500 hover:text-danger"
@@ -371,8 +339,8 @@ export default function CanchasPage() {
 
         <div className="space-y-4 mt-4">
           {canchasConDatos.map((c) => {
-            const enMantenimiento = c.estado === 'MANTENIMIENTO'
-            const pausada = c.habilitada === false
+            const enMantenimiento = c.status === 'MAINTENANCE'
+            const pausada = c.enabled === false
             const Icon = deporteIcono()
             return (
               <div
@@ -384,8 +352,8 @@ export default function CanchasPage() {
                 className={`bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden cursor-pointer ${pausada ? 'opacity-60' : ''}`}
               >
                 <div className={`relative h-32 bg-gradient-to-br ${gradientePorId(c.id)} flex items-center justify-center`}>
-                  {c.fotoUrl ? (
-                    <img src={c.fotoUrl} alt={c.nombre} className="absolute inset-0 h-full w-full object-cover" />
+                  {c.photoUrl ? (
+                    <img src={c.photoUrl} alt={c.name} className="absolute inset-0 h-full w-full object-cover" />
                   ) : (
                     <Icon className="h-9 w-9 text-white/70" />
                   )}
@@ -399,14 +367,14 @@ export default function CanchasPage() {
                   </span>
                 </div>
                 <div className="p-3.5">
-                  <p className="font-sans font-bold text-sm text-neutral-900 dark:text-neutral-50">{c.nombre}</p>
+                  <p className="font-sans font-bold text-sm text-neutral-900 dark:text-neutral-50">{c.name}</p>
                   <p className="flex items-center gap-1.5 font-sans text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
                     <Icon className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" />
-                    {c.deporte}
+                    {c.sport}
                   </p>
                   <div className="flex items-center justify-between mt-3">
                     <p className="font-sans font-bold text-brand-primary text-base">
-                      S/{c.precioHora.toFixed(0)}
+                      S/{c.pricePerHour.toFixed(0)}
                       <span className="font-sans font-normal text-xs text-neutral-400 dark:text-neutral-500"> /hr</span>
                     </p>
                     <div className="flex items-center gap-2">
@@ -435,7 +403,7 @@ export default function CanchasPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          setCanchaMantenimiento({ id: c.id, nombre: c.nombre })
+                          setCanchaMantenimiento({ id: c.id, name: c.name })
                         }}
                         aria-label="Programar mantenimiento"
                         className="h-8 w-8 rounded-lg border border-neutral-200 dark:border-neutral-700 flex items-center justify-center text-warning"
@@ -445,7 +413,7 @@ export default function CanchasPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          pedirConfirmacionEliminar({ id: c.id, nombre: c.nombre })
+                          pedirConfirmacionEliminar({ id: c.id, name: c.name })
                         }}
                         aria-label="Eliminar cancha permanentemente"
                         className="h-8 w-8 rounded-lg border border-neutral-200 dark:border-neutral-700 flex items-center justify-center text-danger"
@@ -484,7 +452,7 @@ export default function CanchasPage() {
               <div className="flex-1">
                 <p className="font-sans font-bold text-base text-danger">Esta acción es permanente</p>
                 <p className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mt-1">
-                  Vas a eliminar <span className="font-semibold">{canchaAEliminar.nombre}</span> para siempre. No se puede deshacer.
+                  Vas a eliminar <span className="font-semibold">{canchaAEliminar.name}</span> para siempre. No se puede deshacer.
                 </p>
               </div>
               <button
@@ -548,8 +516,8 @@ export default function CanchasPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className={`relative h-32 bg-gradient-to-br ${gradientePorId(canchaDetalle.id)} flex items-center justify-center`}>
-              {canchaDetalle.fotoUrl ? (
-                <img src={canchaDetalle.fotoUrl} alt={canchaDetalle.nombre} className="absolute inset-0 h-full w-full object-cover" />
+              {canchaDetalle.photoUrl ? (
+                <img src={canchaDetalle.photoUrl} alt={canchaDetalle.name} className="absolute inset-0 h-full w-full object-cover" />
               ) : (
                 <Goal className="h-9 w-9 text-white/70" />
               )}
@@ -564,15 +532,15 @@ export default function CanchasPage() {
 
             <div className="p-5">
               <div className="flex items-start justify-between gap-2">
-                <p className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50">{canchaDetalle.nombre}</p>
+                <p className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50">{canchaDetalle.name}</p>
                 <p className="font-sans font-bold text-brand-primary whitespace-nowrap">
-                  S/{canchaDetalle.precioHora.toFixed(2)}
+                  S/{canchaDetalle.pricePerHour.toFixed(2)}
                   <span className="font-sans font-normal text-xs text-neutral-400 dark:text-neutral-500"> /hora</span>
                 </p>
               </div>
               <p className="flex items-center gap-1.5 font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-1 capitalize">
                 <Goal className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" />
-                {canchaDetalle.deporte}
+                {canchaDetalle.sport}
               </p>
 
               <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-700/60 space-y-3">
@@ -585,14 +553,14 @@ export default function CanchasPage() {
                       Horario de atención
                     </p>
                     <p className="font-sans text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                      {canchaDetalle.horaApertura && canchaDetalle.horaCierre
-                        ? `${canchaDetalle.horaApertura} a ${canchaDetalle.horaCierre}`
+                      {canchaDetalle.openTime && canchaDetalle.closeTime
+                        ? `${canchaDetalle.openTime} a ${canchaDetalle.closeTime}`
                         : 'Sin restricción (abierta las 24 horas)'}
                     </p>
                   </div>
                 </div>
 
-                {canchaDetalle.descripcion && (
+                {canchaDetalle.description && (
                   <div className="flex items-start gap-3">
                     <span className="h-9 w-9 rounded-lg bg-brand-secondary/15 text-brand-primary flex items-center justify-center shrink-0">
                       <Info className="h-4 w-4" />
@@ -602,7 +570,7 @@ export default function CanchasPage() {
                         Descripción
                       </p>
                       <p className="font-sans text-sm text-neutral-700 dark:text-neutral-200">
-                        {canchaDetalle.descripcion}
+                        {canchaDetalle.description}
                       </p>
                     </div>
                   </div>
@@ -636,7 +604,7 @@ export default function CanchasPage() {
       {canchaMantenimiento && !programandoNuevo && (
         <MantenimientosProgramadosModal
           canchaId={canchaMantenimiento.id}
-          canchaNombre={canchaMantenimiento.nombre}
+          canchaNombre={canchaMantenimiento.name}
           onClose={() => setCanchaMantenimiento(null)}
           onProgramarNuevo={() => setProgramandoNuevo(true)}
         />

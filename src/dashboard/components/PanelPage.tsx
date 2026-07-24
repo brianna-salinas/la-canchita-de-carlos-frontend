@@ -15,49 +15,46 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import AppShell from '../../shared/components/AppShell'
 import {
-  useAlquileresHoy,
-  calcularResumen,
-  fraseDelDia,
-  calcularSiguienteHorarioLibre,
-  calcularOcupacionSemanal,
-  type OcupacionDia,
-  type ProximaLibre,
+  useTodayBookings,
+  calculateSummary,
+  dayPhrase,
+  calculateNextFreeSlot,
+  calculateWeeklyOccupancy,
+  type DayOccupancy,
+  type NextFreeSlot,
 } from '../hooks/usePanelData'
-import { useCanchas, useReservas, useBloqueos, type Bloqueo } from '../../bookings/hooks/useCalendario'
+import { useCourts, useBookings, useScheduleBlocks, type ScheduleBlock } from '../../bookings/hooks/useCalendario'
 import { useAuth } from '../../auth/useAuth'
 import { apiClient } from '../../shared/api/client'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
 import { toISODate, hourToNum } from '../../shared/utils/date'
 
 const ESTADO_LABEL: Record<string, string> = {
-  PAGADO: 'Pagado',
-  PARCIAL: 'Parcial',
-  PENDIENTE: 'Pendiente',
+  PAID: 'Pagado',
+  PARTIAL: 'Parcial',
+  PENDING: 'Pendiente',
 }
 
 const ESTADO_BADGE: Record<string, string> = {
-  PAGADO: 'bg-success/15 text-success',
-  PARCIAL: 'bg-warning/15 text-warning',
-  PENDIENTE: 'bg-danger/15 text-danger',
+  PAID: 'bg-success/15 text-success',
+  PARTIAL: 'bg-warning/15 text-warning',
+  PENDING: 'bg-danger/15 text-danger',
 }
 
 const ESTADO_BORDER: Record<string, string> = {
-  PAGADO: 'border-success',
-  PARCIAL: 'border-warning',
-  PENDIENTE: 'border-danger',
+  PAID: 'border-success',
+  PARTIAL: 'border-warning',
+  PENDING: 'border-danger',
 }
 
 const DIAS_SEMANA = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
-// Declarados fuera del componente (no dentro del render de PanelPage) para
-// que React no los recree en cada render — si no, pierden su estado interno
-// en cada re-render del padre (react-hooks/static-components).
 function SiguienteHorarioCard({
   proximaLibre,
   onReservar,
 }: {
-  proximaLibre: ProximaLibre | null
-  onReservar: (proximaLibre: ProximaLibre) => void
+  proximaLibre: NextFreeSlot | null
+  onReservar: (proximaLibre: NextFreeSlot) => void
 }) {
   return (
     <div className="bg-brand-primary rounded-2xl p-5 text-white">
@@ -67,13 +64,13 @@ function SiguienteHorarioCard({
             Siguiente Horario Libre
           </p>
           <p className="font-sans font-bold text-2xl md:text-3xl mt-1">
-            {proximaLibre ? proximaLibre.horaInicio : '—'}
+            {proximaLibre ? proximaLibre.startTime : '—'}
             {proximaLibre && (
-              <span className="md:hidden"> - {proximaLibre.canchaNombre}</span>
+              <span className="md:hidden"> - {proximaLibre.courtName}</span>
             )}
           </p>
           <p className="hidden md:block font-sans text-sm text-white/80 mt-1">
-            {proximaLibre ? proximaLibre.canchaNombre : 'Sin horarios libres hoy'}
+            {proximaLibre ? proximaLibre.courtName : 'Sin horarios libres hoy'}
           </p>
         </div>
         <button
@@ -89,7 +86,7 @@ function SiguienteHorarioCard({
   )
 }
 
-function OcupacionCard({ ocupacion }: { ocupacion: OcupacionDia[] }) {
+function OcupacionCard({ ocupacion }: { ocupacion: DayOccupancy[] }) {
   const isoHoy = toISODate(new Date())
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5">
@@ -101,13 +98,13 @@ function OcupacionCard({ ocupacion }: { ocupacion: OcupacionDia[] }) {
       </div>
       <div className="h-32 rounded-lg bg-neutral-50 dark:bg-neutral-900 flex items-end justify-between gap-1.5 px-2 pt-3 pb-1.5">
         {ocupacion.map((dia) => {
-          const esHoy = toISODate(dia.fecha) === isoHoy
+          const esHoy = toISODate(dia.date) === isoHoy
           return (
-            <div key={dia.fecha.toISOString()} className="flex-1 h-full flex items-end">
+            <div key={dia.date.toISOString()} className="flex-1 h-full flex items-end">
               <div
                 className={`w-full rounded-t ${esHoy ? 'bg-brand-primary' : 'bg-brand-secondary/60'}`}
-                style={{ height: `${Math.max(4, dia.porcentaje)}%` }}
-                title={`${dia.porcentaje}% ocupado`}
+                style={{ height: `${Math.max(4, dia.percentage)}%` }}
+                title={`${dia.percentage}% ocupado`}
               />
             </div>
           )
@@ -118,7 +115,7 @@ function OcupacionCard({ ocupacion }: { ocupacion: OcupacionDia[] }) {
           <span
             key={d + i}
             className={`font-sans text-xs w-6 text-center ${
-              toISODate(ocupacion[i]?.fecha ?? new Date()) === isoHoy
+              toISODate(ocupacion[i]?.date ?? new Date()) === isoHoy
                 ? 'font-bold text-neutral-900 dark:text-neutral-50'
                 : 'text-neutral-400 dark:text-neutral-500'
             }`}
@@ -131,17 +128,12 @@ function OcupacionCard({ ocupacion }: { ocupacion: OcupacionDia[] }) {
   )
 }
 
-// Cada Bloqueo es UNA franja de una hora (así se guardan en la base de
-// datos), así que un mantenimiento de 11 a 13h son en realidad 2 filas.
-// Antes esto generaba un mensaje por fila ("Cancha 1 en mantenimiento hoy
-// a las 11.", "Cancha 1 en mantenimiento hoy a las 12.", ...); acá se
-// agrupan por cancha y se arma un solo mensaje con el rango completo.
-function agruparBloqueosPorCancha(bloqueos: Bloqueo[]): string[] {
+function agruparBloqueosPorCancha(bloqueos: ScheduleBlock[]): string[] {
   const porCancha = new Map<number, { nombre: string; horas: string[] }>()
   for (const b of bloqueos) {
-    const entrada = porCancha.get(b.canchaId) ?? { nombre: b.canchaNombre, horas: [] }
-    entrada.horas.push(b.hora)
-    porCancha.set(b.canchaId, entrada)
+    const entrada = porCancha.get(b.courtId) ?? { nombre: b.courtName, horas: [] }
+    entrada.horas.push(b.time)
+    porCancha.set(b.courtId, entrada)
   }
   return Array.from(porCancha.values()).map(({ nombre, horas }) => {
     const ordenadas = [...horas].sort((a, c) => hourToNum(a) - hourToNum(c))
@@ -152,7 +144,7 @@ function agruparBloqueosPorCancha(bloqueos: Bloqueo[]): string[] {
   })
 }
 
-function AvisoCard({ bloqueosHoy }: { bloqueosHoy: Bloqueo[] }) {
+function AvisoCard({ bloqueosHoy }: { bloqueosHoy: ScheduleBlock[] }) {
   const sinAvisos = bloqueosHoy.length === 0
   const mensaje = sinAvisos
     ? 'No hay avisos de mantenimiento programados por ahora.'
@@ -195,24 +187,24 @@ export default function PanelPage() {
     month: 'long',
   })
 
-  const { data: alquileres = [], isLoading, isError } = useAlquileresHoy()
-  const resumen = calcularResumen(alquileres)
+  const { data: alquileres = [], isLoading, isError } = useTodayBookings()
+  const resumen = calculateSummary(alquileres)
 
-  const { data: canchas = [] } = useCanchas()
-  const { data: reservas = [] } = useReservas()
+  const { data: canchas = [] } = useCourts()
+  const { data: reservas = [] } = useBookings()
   const isoHoy = toISODate(new Date())
-  const { data: bloqueosHoy = [] } = useBloqueos(isoHoy)
+  const { data: bloqueosHoy = [] } = useScheduleBlocks(isoHoy)
 
   async function marcarComoPagado(id: number, montoTotal: number) {
     setMenuAbierto(null)
     try {
 
       const alquiler = alquileres.find((a) => a.id === id)
-      const saldo = montoTotal - (alquiler?.montoPagado ?? 0)
+      const saldo = montoTotal - (alquiler?.paidAmount ?? 0)
       if (saldo > 0) {
         await apiClient.post('/payments', { bookingId: id, amount: saldo, method: 'EFECTIVO' })
       }
-      await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
+      await queryClient.invalidateQueries({ queryKey: ['bookings'] })
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo marcar como pagado. Intenta de nuevo.'))
     }
@@ -224,25 +216,22 @@ export default function PanelPage() {
     try {
 
       await apiClient.post(`/bookings/${id}/cancelar`)
-      await queryClient.invalidateQueries({ queryKey: ['alquileres'] })
+      await queryClient.invalidateQueries({ queryKey: ['bookings'] })
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo cancelar el alquiler. Intenta de nuevo.'))
     }
   }
 
-  const montoEsperado = alquileres.reduce((sum, a) => sum + a.montoTotal, 0)
+  const montoEsperado = alquileres.reduce((sum, a) => sum + a.totalAmount, 0)
   const porcentajeCobrado =
-    montoEsperado > 0 ? Math.round((resumen.ingresoHoy / montoEsperado) * 100) : 0
+    montoEsperado > 0 ? Math.round((resumen.todayRevenue / montoEsperado) * 100) : 0
 
-  const proximaLibre = calcularSiguienteHorarioLibre(canchas, alquileres)
-  const ocupacionSemanal = calcularOcupacionSemanal(reservas, canchas)
+  const proximaLibre = calculateNextFreeSlot(canchas, alquileres)
+  const ocupacionSemanal = calculateWeeklyOccupancy(reservas, canchas)
 
-  // Antes el botón "Reservar Ya" no tenía onClick: no pasaba nada al
-  // presionarlo. Ahora manda directo a Nueva Reserva prellenada con la
-  // cancha/fecha/hora que el propio Panel calculó como próxima libre.
-  function reservarProximaLibre(proxima: ProximaLibre) {
+  function reservarProximaLibre(proxima: NextFreeSlot) {
     navigate(
-      `/calendario/nueva-reserva?canchaId=${proxima.canchaId}&fecha=${isoHoy}&horaInicio=${proxima.horaInicio}`,
+      `/calendario/nueva-reserva?canchaId=${proxima.courtId}&fecha=${isoHoy}&horaInicio=${proxima.startTime}`,
     )
   }
 
@@ -259,7 +248,7 @@ export default function PanelPage() {
         Hoy, {hoy}
       </h1>
       <p className="hidden md:block font-sans text-base text-neutral-500 dark:text-neutral-400 mt-1">
-        Bienvenido de nuevo, {user?.nombreUsuario ?? 'administrador'}. {fraseDelDia(resumen.totalAlquileres)}
+        Bienvenido de nuevo, {user?.username ?? 'administrador'}. {dayPhrase(resumen.totalBookings)}
       </p>
 
       {isError && (
@@ -281,7 +270,7 @@ export default function PanelPage() {
             </span>
           </div>
           <p className="font-sans font-bold text-2xl md:text-3xl text-neutral-900 dark:text-neutral-50 mt-2">
-            {isLoading ? '—' : resumen.totalAlquileres}
+            {isLoading ? '—' : resumen.totalBookings}
           </p>
           <p className="hidden md:block font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-1">hoy</p>
         </div>
@@ -296,7 +285,7 @@ export default function PanelPage() {
             </span>
           </div>
           <p className="font-sans font-bold text-2xl md:text-3xl text-success mt-2">
-            {isLoading ? '—' : `S/${resumen.ingresoHoy}`}
+            {isLoading ? '—' : `S/${resumen.todayRevenue}`}
           </p>
           <div className="hidden md:flex items-center gap-2 mt-2">
             <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-700/60">
@@ -321,10 +310,10 @@ export default function PanelPage() {
             </span>
           </div>
           <p className="font-sans font-bold text-2xl md:text-3xl text-danger mt-2">
-            {isLoading ? '—' : `S/${resumen.montoPendiente}`}
+            {isLoading ? '—' : `S/${resumen.pendingAmount}`}
           </p>
           <p className="hidden md:block font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            {resumen.cantidadPendientes} cobros pendientes
+            {resumen.pendingCount} cobros pendientes
           </p>
         </div>
       </div>
@@ -349,20 +338,20 @@ export default function PanelPage() {
             {alquileres.map((a) => (
               <div
                 key={a.id}
-                className={`bg-white dark:bg-neutral-800 rounded-xl border-l-4 p-4 flex items-center justify-between gap-3 shadow-sm ${ESTADO_BORDER[a.estadoPago]}`}
+                className={`bg-white dark:bg-neutral-800 rounded-xl border-l-4 p-4 flex items-center justify-between gap-3 shadow-sm ${ESTADO_BORDER[a.paymentStatus]}`}
               >
                 <div className="min-w-0">
                   <p className="font-sans font-semibold text-sm text-neutral-900 dark:text-neutral-50 truncate">
-                    {a.canchaNombre} • {a.horaInicio} - {a.horaFin}
+                    {a.courtName} • {a.startTime} - {a.endTime}
                   </p>
                   <p className="font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
-                    {a.clienteNombre}
+                    {a.customerName}
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 rounded-full px-3 py-1 font-sans text-xs font-semibold ${ESTADO_BADGE[a.estadoPago]}`}
+                  className={`shrink-0 rounded-full px-3 py-1 font-sans text-xs font-semibold ${ESTADO_BADGE[a.paymentStatus]}`}
                 >
-                  {ESTADO_LABEL[a.estadoPago]}
+                  {ESTADO_LABEL[a.paymentStatus]}
                 </span>
               </div>
             ))}
@@ -435,19 +424,19 @@ export default function PanelPage() {
                   className="border-b border-neutral-50 last:border-0"
                 >
                   <td className="font-sans text-sm text-neutral-700 dark:text-neutral-200 py-3">
-                    {a.canchaNombre}
+                    {a.courtName}
                   </td>
                   <td className="font-sans text-sm text-neutral-700 dark:text-neutral-200 py-3">
-                    {a.horaInicio} - {a.horaFin}
+                    {a.startTime} - {a.endTime}
                   </td>
                   <td className="font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50 py-3">
-                    {a.clienteNombre}
+                    {a.customerName}
                   </td>
                   <td className="py-3">
                     <span
-                      className={`inline-block rounded-full px-3 py-1 font-sans text-xs font-semibold ${ESTADO_BADGE[a.estadoPago]}`}
+                      className={`inline-block rounded-full px-3 py-1 font-sans text-xs font-semibold ${ESTADO_BADGE[a.paymentStatus]}`}
                     >
-                      {ESTADO_LABEL[a.estadoPago]}
+                      {ESTADO_LABEL[a.paymentStatus]}
                     </span>
                   </td>
                   <td className="py-3 relative">
@@ -468,9 +457,9 @@ export default function PanelPage() {
                           className="fixed inset-0 z-10 cursor-default"
                         />
                         <div className="absolute right-0 top-full mt-1 z-20 w-52 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-lg py-1">
-                          {a.estadoPago !== 'PAGADO' && (
+                          {a.paymentStatus !== 'PAID' && (
                             <button
-                              onClick={() => marcarComoPagado(a.id, a.montoTotal)}
+                              onClick={() => marcarComoPagado(a.id, a.totalAmount)}
                               className="w-full flex items-center gap-2 px-3 py-2 text-left font-sans text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50"
                             >
                               <CircleCheck className="h-4 w-4 text-success" />

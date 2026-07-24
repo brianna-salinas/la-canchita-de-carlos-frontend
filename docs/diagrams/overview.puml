@@ -1,0 +1,63 @@
+@startuml frontend-overview
+title La Canchita de Carlos — Mapa de módulos
+
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+
+package "auth" {
+  [AuthProvider / useAuth]
+  [LoginPage, RequestAccessPage,\nForgotPasswordPage, VerificarCorreoPage]
+}
+
+package "bookings" {
+  [useCalendario (hooks)]
+  [CalendarioPage, NuevaReservaPage,\nReservasPage, Mantenimiento*Modal]
+}
+
+package "courts" {
+  [CanchasPage, NuevaCanchaPage]
+}
+
+package "customers" {
+  [useCustomers]
+  [ClientesPage]
+}
+
+package "dashboard" {
+  [usePanelData]
+  [PanelPage]
+}
+
+package "settings" {
+  [useAccessRequests, useAdminUsers]
+  [AjustesPage, SolicitudesAccesoPage]
+}
+
+package "shared" {
+  [apiClient / queryClient]
+  [useNotifications]
+  [AppShell, ProtectedRoute,\nMetodoPagoIcon]
+  [date.ts, format.ts,\napi-error.ts, validation.ts]
+}
+
+[useCalendario (hooks)] --> [apiClient / queryClient]
+[useCustomers] --> [apiClient / queryClient]
+[usePanelData] --> [apiClient / queryClient]
+[useAccessRequests, useAdminUsers] --> [apiClient / queryClient]
+[useNotifications] --> [apiClient / queryClient]
+[AuthProvider / useAuth] --> [apiClient / queryClient]
+
+[CanchasPage, NuevaCanchaPage] --> [useCalendario (hooks)]
+
+[usePanelData] --> [useCalendario (hooks)]
+
+[CalendarioPage, NuevaReservaPage,\nReservasPage, Mantenimiento*Modal] --> [AppShell, ProtectedRoute,\nMetodoPagoIcon]
+[CanchasPage, NuevaCanchaPage] --> [AppShell, ProtectedRoute,\nMetodoPagoIcon]
+[ClientesPage] --> [AppShell, ProtectedRoute,\nMetodoPagoIcon]
+[PanelPage] --> [AppShell, ProtectedRoute,\nMetodoPagoIcon]
+[AjustesPage, SolicitudesAccesoPage] --> [AppShell, ProtectedRoute,\nMetodoPagoIcon]
+
+[AppShell, ProtectedRoute,\nMetodoPagoIcon] --> [AuthProvider / useAuth]
+[AppShell, ProtectedRoute,\nMetodoPagoIcon] --> [useNotifications]
+
+@enduml

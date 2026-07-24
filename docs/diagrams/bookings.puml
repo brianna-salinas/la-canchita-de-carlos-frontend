@@ -1,99 +1,140 @@
 @startuml bookings-module
-title Módulo: Bookings + Courts (Calendario, Reservas, Canchas)
+title Módulo Frontend: Bookings (Reservas, Canchas, Mantenimientos)
 
 skinparam classAttributeIconSize 0
 skinparam packageStyle rectangle
 
-package "dashboard (tipo compartido)" {
-  interface Alquiler {
+package "bookings.hooks (model)" {
+  class Court {
     +id: number
-    +canchaId: number
-    +canchaNombre: string
-    +clienteId: number | null
-    +clienteNombre: string
-    +tipo?: string
-    +fecha: string
-    +horaInicio: string
-    +horaFin: string
-    +estado: string
-    +estadoPago: "PAGADO" | "PARCIAL" | "PENDIENTE"
-    +montoTotal: number
-    +montoPagado: number
-    +tipoReserva?: "UNICA" | "MULTIDIA" | "RECURRENTE"
-    +serieId?: string
-    +serieModoPago?: "INDIVIDUAL" | "ACUMULADO"
-    +serieEtiqueta?: string
-    +serieTotalFechas?: number
-    +serieIndice?: number
+    +name: string
+    +sport: string
+    +surface: string
+    +pricePerHour: number
+    +status?: 'ACTIVE' | 'MAINTENANCE'
+    +photoUrl?: string
+    +description?: string
+    +enabled?: boolean
+    +openTime?: string
+    +closeTime?: string
   }
+
+  class ScheduleBlock {
+    +id: number
+    +courtId: number
+    +courtName: string
+    +date: string
+    +time: string
+    +reason: string
+  }
+
+  class MaintenanceBlock {
+    +id: number
+    +date: string
+    +time: string
+    +reason: string
+  }
+
+  class ScheduleMaintenanceInput {
+    +courtId: number
+    +dates: string[]
+    +startTime: string
+    +endTime: string
+    +reason?: string
+  }
+
+  class BookingApiRow << (D,lightblue) DTO backend >> {
+    +id: number
+    +courtId: number
+    +court?: { name: string }
+    +customerId?: number
+    +customerName: string
+    +type?: string
+    +date: string
+    +startTime: string
+    +endTime: string
+    +status: string
+    +paymentStatus: string
+    +totalAmount: number
+    +paidAmount: number
+    +bookingType?: string
+    +seriesId?: string
+    +seriesPaymentMode?: string
+    +seriesLabel?: string
+    +seriesTotalDates?: number
+    +seriesIndex?: number
+  }
+
+  class "mapBookingRow()" as mapBookingRow << (F,orchid) mapper >>
+  class "mapCourtRow()" as mapCourtRow << (F,orchid) mapper >>
+
+  mapBookingRow ..> BookingApiRow
+  mapCourtRow ..> Court
 }
 
-package "bookings" {
-  interface Cancha {
-    +id: number
-    +nombre: string
-    +deporte: string
-    +superficie: string
-    +precioHora: number
-    +estado?: "ACTIVA" | "MANTENIMIENTO"
-    +fotoUrl?: string
-    +descripcion?: string
-    +habilitada?: boolean
+package "bookings.hooks (queries and mutations)" {
+  class useCourts << (F,orchid) query >> {
+    +(): UseQueryResult<Court[]>
+  }
+  class useAllCourts << (F,orchid) query >> {
+    +(): UseQueryResult<Court[]>
+  }
+  class useBookings << (F,orchid) query >> {
+    +(): UseQueryResult<Booking[]>
+  }
+  class useScheduleBlocks << (F,orchid) query >> {
+    +(date): UseQueryResult<ScheduleBlock[]>
+  }
+  class useScheduleBlocksRange << (F,orchid) query >> {
+    +(dates): { data: ScheduleBlock[], isLoading }
+  }
+  class useScheduleMaintenance << (F,orchid) mutation >> {
+    +(): UseMutationResult<void, ScheduleMaintenanceInput>
+  }
+  class useUpcomingMaintenance << (F,orchid) query >> {
+    +(courtId): UseQueryResult<MaintenanceBlock[]>
+  }
+  class useCancelMaintenanceBlock << (F,orchid) mutation >> {
+    +(): UseMutationResult<void, number>
   }
 
-  interface Bloqueo {
-    +id: number
-    +canchaId: number
-    +canchaNombre: string
-    +fecha: string
-    +hora: string
-    +motivo: string
-  }
-
-  class "useCanchas" as useCanchas << (F,orchid) hook >> {
-    +() : UseQueryResult<Cancha[]>
-  }
-
-  class "useReservas" as useReservas << (F,orchid) hook >> {
-    +() : UseQueryResult<Alquiler[]>
-  }
-
-  class "useBloqueos" as useBloqueos << (F,orchid) hook >> {
-    +() : UseQueryResult<Bloqueo[]>
-  }
-
-  useCanchas ..> Cancha : trae
-  useReservas ..> Alquiler : trae
-  useBloqueos ..> Bloqueo : trae
-  Bloqueo "*" --> "1" Cancha : canchaId
+  useCourts ..> Court
+  useAllCourts ..> Court
+  useBookings ..> mapBookingRow
+  useScheduleBlocks ..> ScheduleBlock
+  useScheduleBlocksRange ..> ScheduleBlock
+  useScheduleMaintenance ..> ScheduleMaintenanceInput
+  useUpcomingMaintenance ..> MaintenanceBlock
+  useCancelMaintenanceBlock ..> MaintenanceBlock
 }
 
-package "componentes (pantallas)" {
-  class CalendarioPage << (P,#F08080) página >>
-  class ReservasPage << (P,#F08080) página >>
-  class NuevaReservaPage << (P,#F08080) página >>
-  class CanchasPage << (P,#F08080) página >>
-  class NuevaCanchaPage << (P,#F08080) página >>
+package "bookings.components" {
+  class CalendarioPage {
+    +vista: 'dia' | 'semana' | 'mes'
+  }
+  class NuevaReservaPage {
+    +tipoReserva: TipoReserva
+    +metodoPago: MetodoPago
+  }
+  class ReservasPage {
+    +pagoPendiente: PagoPendiente
+  }
+  class ProgramarMantenimientoModal
+  class MantenimientosProgramadosModal
 
-  CalendarioPage ..> useReservas
-  CalendarioPage ..> useBloqueos
-  ReservasPage ..> useReservas
-  NuevaReservaPage ..> useCanchas
-  NuevaReservaPage ..> useReservas
-  CanchasPage ..> useCanchas
-  CanchasPage ..> useReservas
-  NuevaCanchaPage ..> useCanchas
+  CalendarioPage ..> useScheduleBlocks
+  CalendarioPage ..> useScheduleBlocksRange
+  CalendarioPage ..> useBookings
+  CalendarioPage ..> useCourts
+  CalendarioPage ..> ProgramarMantenimientoModal
+  NuevaReservaPage ..> useCourts
+  NuevaReservaPage ..> useBookings
+  ReservasPage ..> useCourts
+  ReservasPage ..> useBookings
+  ProgramarMantenimientoModal ..> useScheduleMaintenance
+  MantenimientosProgramadosModal ..> useUpcomingMaintenance
+  MantenimientosProgramadosModal ..> useCancelMaintenanceBlock
+  MantenimientosProgramadosModal ..> ProgramarMantenimientoModal
 }
-
-note bottom of useCanchas
-  Fase de fake API (Sprint 1): todos estos hooks
-  leen de json-server (db.json). Se reemplazan por
-  GET /api/courts, /api/bookings, /api/court-blocks
-  del backend real en Sprint 2.
-  Nota: no existe carpeta "courts/hooks" separada;
-  Canchas y Reservas comparten el mismo archivo de
-  hooks (useCalendario.ts), igual que en el backend
-  ambos aggregates viven en el bounded context Bookings.
-end note
 
 @enduml

@@ -4,14 +4,14 @@ import { useAuth } from '../../auth/useAuth'
 import { ArrowLeft, ClipboardCheck, Mail, CalendarDays, Check, X, Lock, Trash2 } from 'lucide-react'
 import AppShell from '../../shared/components/AppShell'
 import {
-  useSolicitudes,
-  useAprobarSolicitud,
-  useRechazarSolicitud,
-  formatFechaLarga,
-  formatFechaRelativa,
+  useAccessRequests,
+  useApproveAccessRequest,
+  useRejectAccessRequest,
+  formatLongDate,
+  formatRelativeDate,
 } from '../hooks/useSolicitudes'
-import { useUsuarios, useDesactivarUsuario, formatActivoHace } from '../hooks/useUsuarios'
-import { iniciales } from '../../shared/utils/format'
+import { useAdminUsers, useDeactivateAdminUser, formatLastActive } from '../hooks/useUsuarios'
+import { initials } from '../../shared/utils/format'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
 
 function esRecienActivo(iso?: string) {
@@ -24,40 +24,28 @@ export default function SolicitudesAccesoPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  // Solo el dueño administra accesos (el backend ya lo exige con
-  // requireOwner en /users/solicitudes). Antes un administrador no-dueño
-  // podía llegar aquí escribiendo la URL directamente y solo se topaba con
-  // errores 403 al intentar cualquier acción.
   useEffect(() => {
-    if (user && !user.esDueno) {
+    if (user && !user.isOwner) {
       navigate('/ajustes', { replace: true })
     }
   }, [user, navigate])
 
-  const { data: solicitudes = [] } = useSolicitudes()
-  const aprobar = useAprobarSolicitud()
-  const rechazar = useRechazarSolicitud()
-  const { data: usuarios = [] } = useUsuarios()
-  const desactivarUsuario = useDesactivarUsuario()
+  const { data: solicitudes = [] } = useAccessRequests()
+  const aprobar = useApproveAccessRequest()
+  const rechazar = useRejectAccessRequest()
+  const { data: usuarios = [] } = useAdminUsers()
+  const desactivarUsuario = useDeactivateAdminUser()
 
   const [tab, setTab] = useState<'pendientes' | 'aprobados'>('pendientes')
 
-  const pendientes = solicitudes.filter((s) => s.estado === 'PENDIENTE')
-  // Antes esta pantalla tenía DOS listas de "aprobados" separadas: la
-  // pestaña "Aprobados" (que filtraba `solicitudes` por estado APROBADO,
-  // pero /users/solicitudes solo devuelve pendientes, así que esa pestaña
-  // estaba siempre vacía) y una sección aparte "Usuarios Aprobados" debajo
-  // (que sí usaba los usuarios reales). Se quita la sección duplicada y la
-  // pestaña "Aprobados" ahora muestra los usuarios reales con acceso.
-  const usuariosAprobados = usuarios.filter((u) => !u.esDueno && u.estado === 'ACTIVO')
+  const pendientes = solicitudes.filter((s) => s.status === 'PENDING')
+  const usuariosAprobados = usuarios.filter((u) => !u.isOwner && u.status === 'ACTIVE')
 
   async function quitarAcceso(id: number) {
     if (!window.confirm('¿Quitar el acceso a este administrador?')) return
     try {
       await desactivarUsuario.mutateAsync(id)
     } catch (err) {
-      // El backend rechaza esto si es el único dueño del sistema, con un
-      // mensaje explicando por qué; se muestra tal cual en vez de uno genérico.
       window.alert(getApiErrorMessage(err, 'No se pudo quitar el acceso. Intenta de nuevo.'))
     }
   }
@@ -110,12 +98,12 @@ export default function SolicitudesAccesoPage() {
             {pendientes.map((s) => (
               <div key={s.id} className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50">{s.nombre}</p>
+                  <p className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50">{s.name}</p>
                   <span className="shrink-0 rounded-lg bg-neutral-100 dark:bg-neutral-700/60 px-2 py-1 font-sans text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-                    {formatFechaRelativa(s.creadoEn)}
+                    {formatRelativeDate(s.createdAt)}
                   </span>
                 </div>
-                <p className="font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">{s.correo}</p>
+                <p className="font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">{s.email}</p>
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => aprobar(s)}
@@ -145,26 +133,26 @@ export default function SolicitudesAccesoPage() {
             {usuariosAprobados.map((u) => (
               <div key={u.id} className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
                 <div className="flex items-center gap-3">
-                  {u.fotoUrl ? (
+                  {u.photoUrl ? (
                     <img
-                      src={u.fotoUrl}
-                      alt={u.nombre}
+                      src={u.photoUrl}
+                      alt={u.name}
                       className="h-11 w-11 rounded-full object-cover shrink-0"
                     />
                   ) : (
                     <span className="h-11 w-11 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-sm font-bold flex items-center justify-center shrink-0">
-                      {iniciales(u.nombre)}
+                      {initials(u.name)}
                     </span>
                   )}
                   <div className="min-w-0">
-                    <p className="font-sans font-bold text-sm text-neutral-900 dark:text-neutral-50">{u.nombre}</p>
+                    <p className="font-sans font-bold text-sm text-neutral-900 dark:text-neutral-50">{u.name}</p>
                     <p className="flex items-center gap-1.5 font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
-                          esRecienActivo(u.ultimoAcceso) ? 'bg-brand-primary' : 'bg-neutral-300'
+                          esRecienActivo(u.lastAccess) ? 'bg-brand-primary' : 'bg-neutral-300'
                         }`}
                       />
-                      {formatActivoHace(u.ultimoAcceso)}
+                      {formatLastActive(u.lastAccess)}
                     </p>
                   </div>
                 </div>
@@ -261,18 +249,18 @@ export default function SolicitudesAccesoPage() {
                       className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-4"
                     >
                       <span className="h-11 w-11 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-sm font-bold flex items-center justify-center shrink-0">
-                        {iniciales(s.nombre)}
+                        {initials(s.name)}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-sans font-bold text-sm text-neutral-900 dark:text-neutral-50">{s.nombre}</p>
+                        <p className="font-sans font-bold text-sm text-neutral-900 dark:text-neutral-50">{s.name}</p>
                         <div className="flex items-center gap-4 mt-0.5">
                           <span className="flex items-center gap-1.5 font-sans text-xs text-neutral-500 dark:text-neutral-400">
                             <Mail className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" />
-                            {s.correo}
+                            {s.email}
                           </span>
                           <span className="flex items-center gap-1.5 font-sans text-xs text-neutral-500 dark:text-neutral-400">
                             <CalendarDays className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" />
-                            {formatFechaLarga(s.creadoEn)}
+                            {formatLongDate(s.createdAt)}
                           </span>
                         </div>
                       </div>
@@ -305,31 +293,31 @@ export default function SolicitudesAccesoPage() {
                       key={u.id}
                       className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-4"
                     >
-                      {u.fotoUrl ? (
+                      {u.photoUrl ? (
                         <img
-                          src={u.fotoUrl}
-                          alt={u.nombre}
+                          src={u.photoUrl}
+                          alt={u.name}
                           className="h-11 w-11 rounded-full object-cover shrink-0"
                         />
                       ) : (
                         <span className="h-11 w-11 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-sm font-bold flex items-center justify-center shrink-0">
-                          {iniciales(u.nombre)}
+                          {initials(u.name)}
                         </span>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-sans font-bold text-sm text-neutral-900 dark:text-neutral-50">{u.nombre}</p>
+                        <p className="font-sans font-bold text-sm text-neutral-900 dark:text-neutral-50">{u.name}</p>
                         <div className="flex items-center gap-4 mt-0.5">
                           <span className="flex items-center gap-1.5 font-sans text-xs text-neutral-500 dark:text-neutral-400">
                             <Mail className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" />
-                            {u.correo}
+                            {u.email}
                           </span>
                           <span className="flex items-center gap-1.5 font-sans text-xs text-neutral-400 dark:text-neutral-500">
                             <span
                               className={`h-1.5 w-1.5 rounded-full ${
-                                esRecienActivo(u.ultimoAcceso) ? 'bg-brand-primary' : 'bg-neutral-300'
+                                esRecienActivo(u.lastAccess) ? 'bg-brand-primary' : 'bg-neutral-300'
                               }`}
                             />
-                            {formatActivoHace(u.ultimoAcceso)}
+                            {formatLastActive(u.lastAccess)}
                           </span>
                         </div>
                       </div>

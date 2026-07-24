@@ -1,9 +1,5 @@
 import { Banknote, CreditCard } from 'lucide-react'
 
-// No usamos los logos oficiales de Yape/Plin como imagen (son marcas
-// registradas y no tenemos el asset), así que se representan con una
-// insignia propia en sus colores de marca aproximados (morado Yape,
-// turquesa Plin) en vez de un ícono genérico sin relación visual.
 type MetodoPago = 'EFECTIVO' | 'YAPE' | 'OTRO'
 
 interface MetodoPagoIconProps {
@@ -20,7 +16,6 @@ export default function MetodoPagoIcon({ value, className = 'h-5 w-5' }: MetodoP
     return <CreditCard className={`${className} text-neutral-500 dark:text-neutral-400`} />
   }
 
-  // YAPE (incluye Plin, mismo método de pago en el sistema)
   return (
     <span className="inline-flex items-center -space-x-1.5">
       <span

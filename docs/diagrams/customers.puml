@@ -1,42 +1,43 @@
 @startuml customers-module
-title Módulo: Customers (Clientes)
+title Módulo Frontend: Customers
 
 skinparam classAttributeIconSize 0
 skinparam packageStyle rectangle
 
-package "customers" {
-  interface Cliente {
+package "customers.hooks (model)" {
+  class Customer {
     +id: number
-    +nombre: string
-    +telefono: string
-    +dni?: string
-    +estado?: "ACTIVO" | "INACTIVO"
-    +fotoUrl?: string
+    +name: string
+    +phone: string
+    +documentNumber?: string
+    +status?: 'ACTIVE' | 'INACTIVE'
+    +photoUrl?: string
   }
 
-  class "useClientes" as useClientes << (F,orchid) hook >> {
-    +() : UseQueryResult<Cliente[]>
+  class CustomerApiRow << (D,lightblue) DTO backend >> {
+    +id: number
+    +name: string
+    +phone: string
+    +documentNumber?: string
+    +status?: string
+    +photoUrl?: string
   }
 
-  useClientes ..> Cliente : trae
+  class "mapCustomerRow()" as mapCustomerRow << (F,orchid) mapper >>
+  mapCustomerRow ..> CustomerApiRow
+  mapCustomerRow ..> Customer
 }
 
-package "componentes (pantallas)" {
-  class ClientesPage << (P,#F08080) página >>
-  ClientesPage ..> useClientes
+package "customers.hooks (queries)" {
+  class useCustomers << (F,orchid) query >> {
+    +(): UseQueryResult<Customer[]>
+  }
+  useCustomers ..> mapCustomerRow
 }
 
-package "shared.api" {
-  class apiClient << (O,#4DBECC) axios instance >>
+package "customers.components" {
+  class ClientesPage
+  ClientesPage ..> useCustomers
 }
-
-useClientes --> apiClient : usa
-
-note bottom of useClientes
-  Fase de fake API (Sprint 1): lee /clientes de
-  json-server (db.json). Se reemplaza por
-  GET /api/customers cuando el backend real
-  esté conectado (Sprint 2).
-end note
 
 @enduml

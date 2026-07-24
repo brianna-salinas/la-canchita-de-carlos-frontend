@@ -1,72 +1,90 @@
 @startuml settings-module
-title Módulo: Settings (Ajustes + Solicitudes de Acceso)
+title Módulo Frontend: Settings (Ajustes, Usuarios, Solicitudes de acceso)
 
 skinparam classAttributeIconSize 0
 skinparam packageStyle rectangle
 
-package "settings" {
-  interface Solicitud {
+package "settings.hooks (model)" {
+  class AccessRequest {
     +id: number
-    +nombre: string
-    +correo: string
-    +creadoEn: string
-    +estado: "PENDIENTE" | "APROBADO" | "RECHAZADO"
+    +name: string
+    +email: string
+    +createdAt: string
+    +status: 'PENDING'|'APPROVED'|'REJECTED'
   }
 
-  interface Usuario {
-    +id: string
-    +nombre: string
-    +correo: string
-    +esDueno: boolean
-    +estado: "ACTIVO" | "INACTIVO"
-    +ultimoAcceso?: string
+  class AdminUser {
+    +id: number
+    +name: string
+    +email: string
+    +isOwner: boolean
+    +status: 'ACTIVE'|'INACTIVE'
+    +lastAccess?: string
+    +photoUrl?: string
   }
 
-  class "useSolicitudes" as useSolicitudes << (F,orchid) hook >> {
-    +() : UseQueryResult<Solicitud[]>
+  class AccessRequestApiRow << (D,lightblue) DTO backend >> {
+    +id: number
+    +name: string
+    +email: string
+    +createdAt: string
   }
 
-  class "useAprobarSolicitud" as useAprobarSolicitud << (F,orchid) hook >> {
-    +() : (solicitud: Solicitud) => Promise<void>
+  class AdminUserApiRow << (D,lightblue) DTO backend >> {
+    +id: number
+    +name: string
+    +email: string
+    +isOwner: boolean
+    +lastAccess?: string
+    +photoUrl?: string
   }
-
-  class "useRechazarSolicitud" as useRechazarSolicitud << (F,orchid) hook >> {
-    +() : (id: number) => Promise<void>
-  }
-
-  class "useUsuarios" as useUsuarios << (F,orchid) hook >> {
-    +() : UseQueryResult<Usuario[]>
-  }
-
-  class "formatFechaLarga" as formatFechaLarga << (F,orchid) función >>
-  class "formatFechaRelativa" as formatFechaRelativa << (F,orchid) función >>
-  class "formatActivoHace" as formatActivoHace << (F,orchid) función >>
-
-  useSolicitudes ..> Solicitud : trae
-  useAprobarSolicitud ..> Solicitud : actualiza
-  useRechazarSolicitud ..> Solicitud : actualiza
-  useUsuarios ..> Usuario : trae
-  formatFechaLarga ..> Solicitud : formatea
-  formatFechaRelativa ..> Solicitud : formatea
-  formatActivoHace ..> Usuario : formatea
 }
 
-package "componentes (pantallas)" {
-  class AjustesPage << (P,#F08080) página >>
-  class SolicitudesAccesoPage << (P,#F08080) página >>
+package "settings.hooks (queries, mutations and utilities)" {
+  class useAccessRequests << (F,orchid) query >> {
+    +(): UseQueryResult<AccessRequest[]>
+  }
+  class useApproveAccessRequest << (F,orchid) mutation >> {
+    +(request): Promise<void>
+  }
+  class useRejectAccessRequest << (F,orchid) mutation >> {
+    +(id): Promise<void>
+  }
+  class useAdminUsers << (F,orchid) query >> {
+    +(): UseQueryResult<AdminUser[]>
+  }
+  class useDeactivateAdminUser << (F,orchid) mutation >> {
+    +(userId): UseMutationResult<void>
+  }
+  class "formatRelativeDate()" as formatRelativeDate << (F,orchid) function >> {
+    +(iso): string
+  }
+  class "formatLastActive()" as formatLastActive << (F,orchid) function >> {
+    +(iso?): string
+  }
 
-  AjustesPage ..> useUsuarios
-  SolicitudesAccesoPage ..> useSolicitudes
-  SolicitudesAccesoPage ..> useAprobarSolicitud
-  SolicitudesAccesoPage ..> useRechazarSolicitud
+  useAccessRequests ..> AccessRequestApiRow
+  useAccessRequests ..> AccessRequest
+  useApproveAccessRequest ..> AccessRequest
+  useRejectAccessRequest ..> AccessRequest
+  useAdminUsers ..> AdminUserApiRow
+  useAdminUsers ..> AdminUser
+  useDeactivateAdminUser ..> AdminUser
+  formatRelativeDate ..> AccessRequest
+  formatLastActive ..> AdminUser
 }
 
-note bottom of useAprobarSolicitud
-  Fase de fake API (Sprint 1): dos escrituras
-  separadas contra json-server (PATCH solicitud +
-  POST usuario), sin transacción. El backend real
-  (authorizeAdminRequest.usecase.ts, Sprint 2) ya
-  hace esto de forma atómica.
-end note
+package "settings.components" {
+  class AjustesPage
+  class SolicitudesAccesoPage
+  SolicitudesAccesoPage ..> useAccessRequests
+  SolicitudesAccesoPage ..> useApproveAccessRequest
+  SolicitudesAccesoPage ..> useRejectAccessRequest
+  SolicitudesAccesoPage ..> useAdminUsers
+  SolicitudesAccesoPage ..> useDeactivateAdminUser
+  AjustesPage ..> useAccessRequests
+  AjustesPage ..> useApproveAccessRequest
+  AjustesPage ..> useRejectAccessRequest
+}
 
 @enduml

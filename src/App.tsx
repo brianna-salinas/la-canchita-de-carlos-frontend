@@ -21,8 +21,6 @@ import NuevaCanchaPage from './courts/components/NuevaCanchaPage.tsx'
 import AjustesPage from './settings/components/AjustesPage.tsx'
 import SolicitudesAccesoPage from './settings/components/SolicitudesAccesoPage.tsx'
 
-// "/" decide destino según si ya hay sesión restaurada desde
-// localStorage, en vez de mandar siempre a /login.
 function RootRedirect() {
   const { user } = useAuth();
   return <Navigate to={user ? "/panel" : "/login"} replace />;

@@ -1,59 +1,57 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../shared/api/client'
 
-export interface Usuario {
+export interface AdminUser {
   id: number
-  nombre: string
-  correo: string
-  esDueno: boolean
-  estado: 'ACTIVO' | 'INACTIVO'
+  name: string
+  email: string
+  isOwner: boolean
+  status: 'ACTIVE' | 'INACTIVE'
   /** ISO timestamp del último acceso, usado para el "Activo hace Xh". */
-  ultimoAcceso?: string
-  fotoUrl?: string
+  lastAccess?: string
+  photoUrl?: string
 }
 
-interface UsuarioApiRow {
+interface AdminUserApiRow {
   id: number
   name: string
   email: string
   isOwner: boolean
   lastAccess?: string | null
-  // Antes el backend no incluía esto en el listado (se pensaba como
-  // "listado liviano"), así que ningún administrador mostraba su foto acá.
   photoUrl?: string | null
 }
 
-export function useUsuarios() {
+export function useAdminUsers() {
   return useQuery({
-    queryKey: ['usuarios'],
+    queryKey: ['adminUsers'],
     queryFn: async () => {
       const { data } = await apiClient.get('/users')
-      return (data as UsuarioApiRow[]).map(
-        (row): Usuario => ({
+      return (data as AdminUserApiRow[]).map(
+        (row): AdminUser => ({
           id: row.id,
-          nombre: row.name,
-          correo: row.email,
-          esDueno: row.isOwner,
-          estado: 'ACTIVO',
-          ultimoAcceso: row.lastAccess ?? undefined,
-          fotoUrl: row.photoUrl ?? undefined,
+          name: row.name,
+          email: row.email,
+          isOwner: row.isOwner,
+          status: 'ACTIVE',
+          lastAccess: row.lastAccess ?? undefined,
+          photoUrl: row.photoUrl ?? undefined,
         }),
       )
     },
   })
 }
 
-export function useDesactivarUsuario() {
+export function useDeactivateAdminUser() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (userId: number) => {
       await apiClient.delete(`/users/${userId}`)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['usuarios'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
   })
 }
 
-export function formatActivoHace(iso?: string) {
+export function formatLastActive(iso?: string) {
   if (!iso) return 'Sin actividad registrada'
   const diffMs = Date.now() - new Date(iso).getTime()
   const minutos = Math.max(1, Math.round(diffMs / 60000))

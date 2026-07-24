@@ -7,21 +7,19 @@
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function esCorreoValido(correo: string): boolean {
-  return EMAIL_REGEX.test(correo.trim())
+export function isValidEmail(email: string): boolean {
+  return EMAIL_REGEX.test(email.trim())
 }
 
-// Celulares peruanos: 9 dígitos empezando en 9, con o sin el prefijo de
-// país 51 (mismo criterio que normalizePhone/assertValidPhone del backend).
-export function esTelefonoValido(telefono: string): boolean {
-  const digitos = telefono.replace(/\D/g, '')
-  const esLocal = digitos.length === 9 && digitos.startsWith('9')
-  const esConCodigoPais = digitos.length === 11 && digitos.startsWith('519')
-  return esLocal || esConCodigoPais
+export function isValidPhone(phone: string): boolean {
+  const digits = phone.replace(/\D/g, '')
+  const isLocal = digits.length === 9 && digits.startsWith('9')
+  const hasCountryCode = digits.length === 11 && digits.startsWith('519')
+  return isLocal || hasCountryCode
 }
 
-export function esPrecioValido(valor: string): boolean {
-  if (!valor.trim()) return false
-  const num = Number(valor)
+export function isValidPrice(value: string): boolean {
+  if (!value.trim()) return false
+  const num = Number(value)
   return Number.isFinite(num) && num > 0
 }

@@ -62,9 +62,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   )
 }
 
-// Hook ubicado a propósito junto a su Provider (patrón estándar de React
-// Context); no es un componente, pero exportarlo desde aquí es intencional.
-// eslint-disable-next-line react-refresh/only-export-components
 export function useTheme() {
   const ctx = useContext(ThemeContext)
   if (!ctx) throw new Error('useTheme debe usarse dentro de <ThemeProvider>')
