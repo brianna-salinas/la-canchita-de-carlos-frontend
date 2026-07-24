@@ -1,25 +1,43 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
-import { Mail, ArrowLeft, MailCheck } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Lock, Eye, EyeOff, CircleCheck, CircleX } from 'lucide-react'
 import AuthLayout, { AuthFooter } from './AuthLayout'
-import { forgotPassword } from '../api'
+import { resetPassword } from '../api'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
 
-export default function ForgotPasswordPage() {
-  const [correo, setCorreo] = useState('')
+export default function ResetPasswordPage() {
+  const [searchParams] = useSearchParams()
+  const token = searchParams.get('token')
+
+  const [nueva, setNueva] = useState('')
+  const [confirmar, setConfirmar] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [enviado, setEnviado] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [listo, setListo] = useState(false)
+  const [error, setError] = useState<string | null>(
+    token ? null : 'El enlace para restablecer tu contraseña no es válido: falta el token.',
+  )
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (!token) return
     setError(null)
+
+    if (nueva.length < 8) {
+      setError('La nueva contraseña debe tener al menos 8 caracteres.')
+      return
+    }
+    if (nueva !== confirmar) {
+      setError('La nueva contraseña y su confirmación no coinciden.')
+      return
+    }
+
     setLoading(true)
     try {
-      await forgotPassword(correo)
-      setEnviado(true)
+      await resetPassword(token, nueva)
+      setListo(true)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'No se pudo enviar el correo. Intenta de nuevo.'))
+      setError(getApiErrorMessage(err, 'No se pudo restablecer tu contraseña. Intenta de nuevo.'))
     } finally {
       setLoading(false)
     }
@@ -49,16 +67,6 @@ export default function ForgotPasswordPage() {
         </div>
       }
     >
-      <Link
-        to="/login"
-        className="inline-flex items-center gap-1 font-sans text-base text-brand-primary dark:text-brand-secondary hover:underline mb-6"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver
-      </Link>
-
-      {/* Marca visible solo en mobile (en desktop ya está en el panel
-          izquierdo azul), mismo estilo que Login y Solicitar Acceso. */}
       <div className="flex md:hidden flex-col items-center text-center mb-6">
         <img
           src="/assets/logo.png"
@@ -72,53 +80,90 @@ export default function ForgotPasswordPage() {
         </h2>
       </div>
 
-      {/* En mobile, el contenido va dentro de una tarjeta blanca (como
-          Login/Solicitar Acceso). En desktop no lleva card. */}
       <div className="bg-white dark:bg-neutral-900 rounded-3xl shadow-md dark:shadow-none p-6 sm:p-8 md:bg-transparent md:shadow-none md:rounded-none md:p-0">
-        {enviado ? (
+        {listo ? (
           <div className="text-center md:text-left">
             <span className="mx-auto md:mx-0 flex h-14 w-14 items-center justify-center rounded-full bg-success/15">
-              <MailCheck className="h-7 w-7 text-success" />
+              <CircleCheck className="h-7 w-7 text-success" />
             </span>
             <h1 className="font-sans font-bold text-2xl md:text-3xl text-neutral-900 dark:text-neutral-50 mt-4">
-              Revisa tu correo
+              ¡Contraseña actualizada!
             </h1>
             <p className="font-sans text-sm md:text-base text-neutral-500 dark:text-neutral-400 mt-2">
-              Si <span className="font-semibold text-neutral-700 dark:text-neutral-200">{correo}</span>{' '}
-              tiene una cuenta con nosotros, te enviamos instrucciones para
-              restablecer tu contraseña.
+              Ya puedes iniciar sesión con tu nueva contraseña.
             </p>
-
             <Link
               to="/login"
               className="mt-6 inline-flex w-full md:w-auto items-center justify-center h-12 px-6 rounded-lg bg-brand-primary text-white font-sans font-semibold text-base hover:bg-brand-primary/90 transition-colors"
             >
-              Volver a iniciar sesión
+              Iniciar sesión
+            </Link>
+          </div>
+        ) : !token ? (
+          <div className="text-center md:text-left">
+            <span className="mx-auto md:mx-0 flex h-14 w-14 items-center justify-center rounded-full bg-danger/15">
+              <CircleX className="h-7 w-7 text-danger" />
+            </span>
+            <h1 className="font-sans font-bold text-2xl md:text-3xl text-neutral-900 dark:text-neutral-50 mt-4">
+              Enlace inválido
+            </h1>
+            <p className="font-sans text-sm md:text-base text-neutral-500 dark:text-neutral-400 mt-2">
+              {error}
+            </p>
+            <Link
+              to="/olvide-password"
+              className="mt-6 inline-flex w-full md:w-auto items-center justify-center h-12 px-6 rounded-lg border border-brand-primary text-brand-primary dark:text-brand-secondary font-sans font-semibold text-base hover:bg-brand-primary/5 transition-colors"
+            >
+              Solicitar un enlace nuevo
             </Link>
           </div>
         ) : (
           <>
             <h1 className="font-sans font-bold text-2xl md:text-3xl text-neutral-900 dark:text-neutral-50 text-center md:text-left">
-              ¿Olvidaste tu contraseña?
+              Restablece tu contraseña
             </h1>
             <p className="font-sans text-sm md:text-base text-neutral-500 dark:text-neutral-400 mt-1 mb-6 text-center md:text-left">
-              Ingresa tu correo y te enviaremos instrucciones para
-              restablecer tu contraseña.
+              Elige una nueva contraseña para tu cuenta.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="font-sans text-base text-neutral-700 dark:text-neutral-200 mb-1 block">
-                  Correo Electrónico
+                  Nueva contraseña
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400 dark:text-neutral-500" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400 dark:text-neutral-500" />
                   <input
-                    type="email"
+                    type={showPassword ? 'text' : 'password'}
                     required
-                    value={correo}
-                    onChange={(e) => setCorreo(e.target.value)}
-                    placeholder="correo@ejemplo.com"
+                    value={nueva}
+                    onChange={(e) => setNueva(e.target.value)}
+                    placeholder="Mínimo 8 caracteres"
+                    className="w-full h-12 pl-10 pr-10 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-base focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-sans text-base text-neutral-700 dark:text-neutral-200 mb-1 block">
+                  Confirmar contraseña
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400 dark:text-neutral-500" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={confirmar}
+                    onChange={(e) => setConfirmar(e.target.value)}
+                    placeholder="Repite tu nueva contraseña"
                     className="w-full h-12 pl-10 pr-3 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans text-base focus:outline-none focus:ring-2 focus:ring-brand-primary/40 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500"
                   />
                 </div>
@@ -135,18 +180,8 @@ export default function ForgotPasswordPage() {
                 disabled={loading}
                 className="w-full h-12 rounded-lg bg-brand-primary dark:bg-brand-secondary text-white dark:text-neutral-900 font-sans font-semibold text-base hover:bg-brand-primary/90 dark:hover:bg-brand-secondary/90 transition-colors disabled:opacity-60"
               >
-                {loading ? 'Enviando...' : 'Enviar instrucciones'}
+                {loading ? 'Guardando...' : 'Restablecer contraseña'}
               </button>
-
-              <p className="font-sans text-base text-center text-neutral-600 dark:text-neutral-300">
-                ¿Ya la recordaste?{' '}
-                <Link
-                  to="/login"
-                  className="text-brand-primary dark:text-brand-secondary font-medium hover:underline"
-                >
-                  Inicia sesión aquí
-                </Link>
-              </p>
             </form>
           </>
         )}

@@ -15,3 +15,11 @@ export async function requestAccess(payload: RequestAccessPayload) {
     password: payload.password,
   })
 }
+
+export async function forgotPassword(email: string) {
+  return apiClient.post('/auth/olvide-password', { email })
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  return apiClient.post('/auth/restablecer-password', { token, newPassword })
+}

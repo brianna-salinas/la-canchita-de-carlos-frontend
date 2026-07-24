@@ -7,6 +7,7 @@ import LoginPage from "./auth/components/LoginPage";
 import RequestAccessPage from "./auth/components/RequestAccessPage";
 import SolicitudEnviadaPage from "./auth/components/SolicitudEnviadaPage";
 import ForgotPasswordPage from "./auth/components/ForgotPasswordPage";
+import ResetPasswordPage from "./auth/components/ResetPasswordPage";
 import VerificarCorreoPage from "./auth/components/VerificarCorreoPage";
 import NotFoundPage from "./shared/components/NotFoundPage";
 import { queryClient } from "./shared/api/queryClient";
@@ -38,6 +39,7 @@ function App() {
             <Route path="/solicitar-acceso" element={<RequestAccessPage />} />
             <Route path="/solicitud-enviada" element={<SolicitudEnviadaPage />} />
             <Route path="/olvide-password" element={<ForgotPasswordPage />} />
+            <Route path="/restablecer-password" element={<ResetPasswordPage />} />
             <Route path="/verificar-correo" element={<VerificarCorreoPage />} />
             <Route path="/panel" element={<ProtectedRoute><PanelPage/></ProtectedRoute>} />
             <Route path="/calendario" element={<ProtectedRoute><CalendarioPage/></ProtectedRoute>} />

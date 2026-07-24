@@ -19,7 +19,7 @@ import { useAccessRequests, useApproveAccessRequest, useRejectAccessRequest } fr
 import { apiClient } from '../../shared/api/client'
 import { initials } from '../../shared/utils/format'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
-import { isValidEmail } from '../../shared/utils/validation'
+import { isValidEmail, validateImageFile } from '../../shared/utils/validation'
 
 type Modo = null | 'perfil' | 'usuario' | 'correo' | 'password'
 
@@ -125,6 +125,11 @@ export default function AjustesPage() {
 
   function subirFoto(archivo: File | undefined) {
     if (!archivo || !user) return
+    const errorValidacion = validateImageFile(archivo)
+    if (errorValidacion) {
+      window.alert(errorValidacion)
+      return
+    }
     setSubiendoFoto(true)
     const formData = new FormData()
     formData.append('foto', archivo)
@@ -138,6 +143,21 @@ export default function AjustesPage() {
         window.alert(getApiErrorMessage(err, 'No se pudo subir la foto. Intenta de nuevo.'))
       })
       .finally(() => setSubiendoFoto(false))
+  }
+
+  async function eliminarFoto() {
+    if (!user) return
+    if (!window.confirm('¿Eliminar tu foto de perfil?')) return
+    setSubiendoFoto(true)
+    try {
+      await apiClient.delete(`/users/${user.id}/foto`)
+      updateUser({ photoUrl: undefined })
+      await queryClient.invalidateQueries({ queryKey: ['adminUsers'] })
+    } catch (err) {
+      window.alert(getApiErrorMessage(err, 'No se pudo eliminar la foto. Intenta de nuevo.'))
+    } finally {
+      setSubiendoFoto(false)
+    }
   }
 
   async function eliminarCuenta() {
@@ -171,7 +191,7 @@ export default function AjustesPage() {
       <input
         ref={fotoInputRef}
         type="file"
-        accept="image/png,image/jpeg"
+        accept="image/png,image/jpeg,image/webp"
         className="hidden"
         onChange={(e) => subirFoto(e.target.files?.[0])}
       />
@@ -198,6 +218,15 @@ export default function AjustesPage() {
             >
               {subiendoFoto ? 'Subiendo...' : 'Editar foto'}
             </button>
+            {user?.photoUrl && (
+              <button
+                onClick={eliminarFoto}
+                disabled={subiendoFoto}
+                className="font-sans text-xs font-semibold text-danger disabled:opacity-50"
+              >
+                Eliminar foto
+              </button>
+            )}
           </div>
           <div className="flex-1 min-w-0 space-y-2.5">
             <div>
@@ -330,6 +359,16 @@ export default function AjustesPage() {
               </button>
             </div>
             <p className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50 text-center">{nombre}</p>
+            {user?.photoUrl && (
+              <button
+                onClick={eliminarFoto}
+                disabled={subiendoFoto}
+                className="flex items-center gap-1 font-sans text-xs font-semibold text-danger hover:underline disabled:opacity-50"
+              >
+                <Trash2 className="h-3 w-3" />
+                Eliminar foto
+              </button>
+            )}
           </div>
 
           <div className="p-6">

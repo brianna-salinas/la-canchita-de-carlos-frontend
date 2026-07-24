@@ -23,3 +23,19 @@ export function isValidPrice(value: string): boolean {
   const num = Number(value)
   return Number.isFinite(num) && num > 0
 }
+
+// Debe coincidir con el límite real del backend (MAX_SIZE_BYTES en
+// platform/storage/SupabaseFileStorage.ts) — esto solo evita subir un
+// archivo pesado para recién ahí enterarse de que el servidor lo rechaza.
+export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+export function validateImageFile(file: File): string | null {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return 'Formato no válido. Solo se aceptan imágenes JPG, PNG o WEBP.'
+  }
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    return 'La imagen pesa más de 5 MB. Elige una imagen más liviana.'
+  }
+  return null
+}

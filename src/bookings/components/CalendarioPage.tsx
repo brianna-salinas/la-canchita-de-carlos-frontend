@@ -796,7 +796,9 @@ export default function CalendarioPage() {
           {/* Grilla del día */}
           {canchasVisibles.length === 0 && !cargando ? (
             <p className="mt-6 font-sans text-sm text-neutral-400 dark:text-neutral-500 text-center py-8 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700">
-              Ocultaste todas las canchas. Ábrelas de nuevo con el filtro "Canchas" de arriba.
+              {canchas.length === 0
+                ? 'Todavía no hay canchas registradas. Crea una desde la sección "Canchas".'
+                : 'Ocultaste todas las canchas. Ábrelas de nuevo con el filtro "Canchas" de arriba.'}
             </p>
           ) : (
           <div className="mt-6 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 overflow-x-auto">

@@ -40,6 +40,15 @@ function formatTelefono(telefono: string) {
   return telefono
 }
 
+// wa.me necesita el número en formato internacional sin '+', ni espacios
+// ni guiones (ej. 51987654321) — si ya viene con código de país lo deja
+// igual, si es un celular local de 9 dígitos le antepone el 51 de Perú.
+function whatsappLink(telefono: string) {
+  const solo = telefono.replace(/\D/g, '')
+  const conCodigo = solo.length === 9 && solo.startsWith('9') ? `51${solo}` : solo
+  return `https://wa.me/${conCodigo}`
+}
+
 interface ClienteConStats extends Customer {
   totalAlquileres: number
   ultimoAlquiler: string | null
@@ -249,10 +258,16 @@ export default function ClientesPage() {
                     </div>
                   </td>
                   <td className="px-2 py-4">
-                    <span className="flex items-center gap-2 font-sans text-sm text-neutral-600 dark:text-neutral-300">
+                    <a
+                      href={whatsappLink(c.phone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Escribir por WhatsApp"
+                      className="flex items-center gap-2 font-sans text-sm text-neutral-600 dark:text-neutral-300 hover:text-success"
+                    >
                       <MessageSquare className="h-4 w-4 text-success" />
                       {formatTelefono(c.phone)}
-                    </span>
+                    </a>
                   </td>
                   <td className="px-2 py-4 font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50">
                     {c.totalAlquileres}
@@ -438,6 +453,15 @@ export default function ClientesPage() {
                 </div>
 
                 <div className="flex items-center justify-center gap-6 mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700/60">
+                  <a
+                    href={whatsappLink(c.phone)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 font-sans text-sm font-medium text-success"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    WhatsApp
+                  </a>
                   <button
                     onClick={() => verHistorial(c)}
                     className="flex items-center gap-1.5 font-sans text-sm font-medium text-brand-primary"

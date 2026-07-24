@@ -6,7 +6,7 @@ import AppShell from '../../shared/components/AppShell'
 import { useAllCourts } from '../../bookings/hooks/useCalendario'
 import { apiClient } from '../../shared/api/client'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
-import { isValidPrice } from '../../shared/utils/validation'
+import { isValidPrice, validateImageFile } from '../../shared/utils/validation'
 
 const DEPORTES = ['Fútbol', 'Vóley', 'Básquet', 'Multiuso']
 
@@ -73,6 +73,12 @@ export default function NuevaCanchaPage() {
 
   function subirFoto(archivo: File | undefined) {
     if (!archivo) return
+    const errorValidacion = validateImageFile(archivo)
+    if (errorValidacion) {
+      setError(errorValidacion)
+      return
+    }
+    setError('')
     setFotoArchivo(archivo)
     const reader = new FileReader()
     reader.onload = () => {
@@ -173,7 +179,7 @@ export default function NuevaCanchaPage() {
         <label className="block bg-white dark:bg-neutral-800 rounded-2xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 py-8 text-center cursor-pointer overflow-hidden">
           <input
             type="file"
-            accept="image/png,image/jpeg"
+            accept="image/png,image/jpeg,image/webp"
             className="hidden"
             onChange={(e) => subirFoto(e.target.files?.[0])}
           />
@@ -184,7 +190,7 @@ export default function NuevaCanchaPage() {
               <ImagePlus className="h-8 w-8 text-neutral-300 mx-auto" />
               <p className="font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-2">Toca para subir portada</p>
               <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-1">
-                Recomendado: 800x600px (JPG/PNG)
+                Recomendado: 800x600px (JPG, PNG o WEBP - máx. 5MB)
               </p>
             </>
           )}
@@ -573,7 +579,7 @@ export default function NuevaCanchaPage() {
               <label className="block border-2 border-dashed border-neutral-200 dark:border-neutral-700 rounded-xl py-14 text-center cursor-pointer hover:border-brand-primary transition-colors overflow-hidden">
                 <input
                   type="file"
-                  accept="image/png,image/jpeg"
+                  accept="image/png,image/jpeg,image/webp"
                   className="hidden"
                   onChange={(e) => subirFoto(e.target.files?.[0])}
                 />
@@ -587,7 +593,7 @@ export default function NuevaCanchaPage() {
                     <p className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mt-3">
                       Toca para subir o arrastra una imagen
                     </p>
-                    <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-1">(JPG, PNG - Max. 5MB)</p>
+                    <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-1">(JPG, PNG o WEBP - máx. 5MB)</p>
                   </>
                 )}
               </label>
