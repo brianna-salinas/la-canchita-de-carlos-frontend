@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Star,
   X,
+  TriangleAlert,
 } from 'lucide-react'
 import AppShell from '../../shared/components/AppShell'
 import { useCustomers, type Customer } from '../hooks/useClientes'
@@ -40,9 +41,6 @@ function formatTelefono(telefono: string) {
   return telefono
 }
 
-// wa.me necesita el número en formato internacional sin '+', ni espacios
-// ni guiones (ej. 51987654321) — si ya viene con código de país lo deja
-// igual, si es un celular local de 9 dígitos le antepone el 51 de Perú.
 function whatsappLink(telefono: string) {
   const solo = telefono.replace(/\D/g, '')
   const conCodigo = solo.length === 9 && solo.startsWith('9') ? `51${solo}` : solo
@@ -76,6 +74,9 @@ export default function ClientesPage() {
   const [form, setForm] = useState<FormState>(FORM_VACIO)
   const [guardando, setGuardando] = useState(false)
   const [errorModal, setErrorModal] = useState<string | null>(null)
+  const [clienteAEliminar, setClienteAEliminar] = useState<Customer | null>(null)
+  const [eliminando, setEliminando] = useState(false)
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null)
 
   const clientesConStats: ClienteConStats[] = useMemo(() => {
     return clientes.map((c) => {
@@ -143,7 +144,7 @@ export default function ClientesPage() {
     setErrorModal(null)
     setGuardando(true)
     try {
-      // POST/PATCH /customers (RF09) contra el backend real.
+
       const payload = { name: form.nombre.trim(), phone: form.telefono.trim(), documentNumber: form.dni.trim() || undefined }
       if (clienteEditando) {
         await apiClient.patch(`/customers/${clienteEditando.id}`, payload)
@@ -159,13 +160,23 @@ export default function ClientesPage() {
     }
   }
 
-  async function eliminarCliente(id: number) {
-    if (!window.confirm('¿Eliminar este cliente? Esta acción no se puede deshacer.')) return
+  function pedirEliminarCliente(c: Customer) {
+    setErrorEliminar(null)
+    setClienteAEliminar(c)
+  }
+
+  async function confirmarEliminarCliente() {
+    if (!clienteAEliminar) return
+    setEliminando(true)
+    setErrorEliminar(null)
     try {
-      await apiClient.delete(`/customers/${id}`)
+      await apiClient.delete(`/customers/${clienteAEliminar.id}`)
       await queryClient.invalidateQueries({ queryKey: ['customers'] })
+      setClienteAEliminar(null)
     } catch (err) {
-      window.alert(getApiErrorMessage(err, 'No se pudo eliminar el cliente. Intenta de nuevo.'))
+      setErrorEliminar(getApiErrorMessage(err, 'No se pudo eliminar el cliente. Intenta de nuevo.'))
+    } finally {
+      setEliminando(false)
     }
   }
 
@@ -179,7 +190,6 @@ export default function ClientesPage() {
       searchValue={busqueda}
       onSearchChange={setBusqueda}
     >
-      {/* ================= DESKTOP ================= */}
       <div className="hidden md:flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-sans font-bold text-3xl text-neutral-900 dark:text-neutral-50">
@@ -238,17 +248,9 @@ export default function ClientesPage() {
                 <tr key={c.id} className="border-b border-neutral-50 last:border-0">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      {c.photoUrl ? (
-                        <img
-                          src={c.photoUrl}
-                          alt={c.name}
-                          className="h-9 w-9 rounded-full object-cover shrink-0"
-                        />
-                      ) : (
-                        <span className="h-9 w-9 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-xs font-bold flex items-center justify-center shrink-0">
-                          {initials(c.name)}
-                        </span>
-                      )}
+                      <span className="h-9 w-9 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-xs font-bold flex items-center justify-center shrink-0">
+                        {initials(c.name)}
+                      </span>
                       <div>
                         <p className="font-sans text-sm font-semibold text-neutral-900 dark:text-neutral-50">{c.name}</p>
                         <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500">
@@ -301,7 +303,7 @@ export default function ClientesPage() {
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => eliminarCliente(c.id)}
+                        onClick={() => pedirEliminarCliente(c)}
                         aria-label="Eliminar cliente"
                         className="text-neutral-400 dark:text-neutral-500 hover:text-danger"
                       >
@@ -385,7 +387,6 @@ export default function ClientesPage() {
         </div>
       </div>
 
-      {/* ================= MOBILE ================= */}
       <div className="md:hidden">
         <h1 className="font-sans font-bold text-2xl text-neutral-900 dark:text-neutral-50">Gestión de Clientes</h1>
 
@@ -477,7 +478,7 @@ export default function ClientesPage() {
                     Editar
                   </button>
                   <button
-                    onClick={() => eliminarCliente(c.id)}
+                    onClick={() => pedirEliminarCliente(c)}
                     className="text-danger"
                     aria-label="Eliminar cliente"
                   >
@@ -502,18 +503,15 @@ export default function ClientesPage() {
         <Plus className="h-6 w-6" />
       </button>
 
-      {/* Modal Nuevo/Editar cliente — bottom sheet en mobile, diálogo centrado en desktop */}
       {modalAbierto && (
         <div
-          className="fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/40 md:px-4"
+          className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/40"
           onClick={() => setModalAbierto(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-neutral-800 w-full max-w-md max-h-[88vh] md:max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 md:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-6"
+            className="bg-white dark:bg-neutral-800 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-5 md:p-6"
           >
-            <div className="md:hidden w-10 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 mx-auto mb-4" />
-
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50">
                 {clienteEditando ? 'Editar Cliente' : 'Nuevo Cliente'}
@@ -578,6 +576,65 @@ export default function ClientesPage() {
               >
                 {guardando ? 'Guardando...' : 'Guardar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {clienteAEliminar && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setClienteAEliminar(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-neutral-800 rounded-2xl border border-danger/30 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-xl"
+          >
+            <div className="flex items-start gap-3 p-5 bg-danger/10">
+              <span className="h-10 w-10 rounded-full bg-danger/20 text-danger flex items-center justify-center shrink-0">
+                <TriangleAlert className="h-5 w-5" />
+              </span>
+              <div className="flex-1">
+                <p className="font-sans font-bold text-base text-danger">Esta acción es permanente</p>
+                <p className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mt-1">
+                  Vas a eliminar a <span className="font-semibold">{clienteAEliminar.name}</span> para siempre. No se puede deshacer.
+                </p>
+              </div>
+              <button
+                onClick={() => setClienteAEliminar(null)}
+                aria-label="Cerrar"
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              {errorEliminar && (
+                <p className="font-sans text-sm text-danger bg-danger/10 rounded-lg px-3 py-2 mb-3" role="alert">
+                  {errorEliminar}
+                </p>
+              )}
+              <p className="font-sans text-sm text-neutral-600 dark:text-neutral-300">
+                También se perderá el historial de reservas asociado a este cliente.
+              </p>
+
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 mt-5">
+                <button
+                  onClick={() => setClienteAEliminar(null)}
+                  disabled={eliminando}
+                  className="h-11 sm:h-10 px-4 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans font-semibold text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700/60 disabled:opacity-60 w-full sm:w-auto"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarEliminarCliente}
+                  disabled={eliminando}
+                  className="h-11 sm:h-10 px-4 rounded-lg bg-danger text-white font-sans font-semibold text-sm hover:bg-danger/90 disabled:opacity-60 w-full sm:w-auto"
+                >
+                  {eliminando ? 'Eliminando...' : 'Sí, eliminar para siempre'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

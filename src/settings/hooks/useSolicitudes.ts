@@ -6,7 +6,7 @@ export interface AccessRequest {
   id: number
   name: string
   email: string
-  /** ISO timestamp de cuándo se envió la solicitud. */
+
   createdAt: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
 }

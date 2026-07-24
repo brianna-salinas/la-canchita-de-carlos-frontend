@@ -57,8 +57,6 @@ export default function ForgotPasswordPage() {
         Volver
       </Link>
 
-      {/* Marca visible solo en mobile (en desktop ya está en el panel
-          izquierdo azul), mismo estilo que Login y Solicitar Acceso. */}
       <div className="flex md:hidden flex-col items-center text-center mb-6">
         <img
           src="/assets/logo.png"
@@ -72,8 +70,6 @@ export default function ForgotPasswordPage() {
         </h2>
       </div>
 
-      {/* En mobile, el contenido va dentro de una tarjeta blanca (como
-          Login/Solicitar Acceso). En desktop no lleva card. */}
       <div className="bg-white dark:bg-neutral-900 rounded-3xl shadow-md dark:shadow-none p-6 sm:p-8 md:bg-transparent md:shadow-none md:rounded-none md:p-0">
         {enviado ? (
           <div className="text-center md:text-left">

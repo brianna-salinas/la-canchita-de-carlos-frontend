@@ -1,11 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import { apiClient, setToken, getToken } from "../shared/api/client";
 
-// La signed URL de la foto de perfil (bucket privado en Supabase) vence a la
-// hora. Antes solo se obtenia una vez (login o al subirla) y quedaba fija en
-// localStorage, asi que pasada la hora la foto "desaparecia sola" del navbar
-// aunque siguiera en el bucket. Se renueva pidiendo /users/me bastante antes
-// de que venza.
 const INTERVALO_REFRESCO_FOTO_MS = 45 * 60 * 1000;
 
 export interface AuthUser {
@@ -42,8 +37,7 @@ function guardarUsuario(user: AuthUser | null) {
     if (user) localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
     else localStorage.removeItem(STORAGE_KEY);
   } catch {
-    // localStorage no disponible (modo privado, etc.) — la sesión
-    // simplemente no persiste entre recargas.
+
   }
 }
 
@@ -99,8 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data } = await apiClient.get("/users/me");
         if (!cancelado) updateUser({ photoUrl: data.photoUrl ?? undefined });
       } catch {
-        // Si falla (sin red, sesion vencida, etc.) se deja la foto como
-        // estaba; el proximo intento programado lo vuelve a resolver.
+
       }
     }
 
@@ -110,10 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelado = true;
       clearInterval(id);
     };
-    // Solo se re-arma el intervalo cuando cambia de usuario (login/logout),
-    // no en cada cambio de `user` (evitaria un loop, ya que refrescarFoto
-    // tambien actualiza `user`).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [user?.id]);
 
   return (
@@ -123,9 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 );
 }
 
-// Hook ubicado a propósito junto a su Provider (patrón estándar de React
-// Context); no es un componente, pero exportarlo desde aquí es intencional.
-// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");

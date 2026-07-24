@@ -2,12 +2,6 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 
-/**
- * Catch-all para rutas que no existen. Antes de esto, el router no
- * tenía ningún fallback: una URL mal escrita o un enlace roto
- * renderizaba una página completamente en blanco, sin forma de saber
- * qué pasó.
- */
 export default function NotFoundPage() {
   const { user } = useAuth()
   const destino = user ? '/panel' : '/login'

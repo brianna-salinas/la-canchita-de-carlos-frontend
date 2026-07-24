@@ -61,7 +61,6 @@ export default function SolicitudesAccesoPage() {
 
   return (
     <AppShell showSearch={false} minimalMobile>
-      {/* Barra superior mobile */}
       <div className="md:hidden sticky top-0 z-20 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 px-4 py-4 flex items-center gap-3">
         <button onClick={() => navigate('/ajustes')} aria-label="Volver" className="text-brand-primary">
           <ArrowLeft className="h-5 w-5" />
@@ -69,7 +68,6 @@ export default function SolicitudesAccesoPage() {
         <h1 className="font-sans font-bold text-lg text-brand-primary">Gestión de Accesos</h1>
       </div>
 
-      {/* ================= MOBILE ================= */}
       <div className="md:hidden px-4 py-4 pb-8 space-y-3 bg-neutral-50 dark:bg-neutral-900 min-h-screen">
         <div className="flex rounded-full bg-neutral-200/60 dark:bg-neutral-700/60 p-1">
           <button
@@ -182,7 +180,6 @@ export default function SolicitudesAccesoPage() {
         </p>
       </div>
 
-      {/* ================= DESKTOP ================= */}
       <div className="hidden md:block">
         <Link to="/ajustes" className="inline-flex items-center gap-1.5 font-sans text-sm font-semibold text-brand-primary hover:underline">
           <ArrowLeft className="h-4 w-4" />

@@ -29,7 +29,6 @@ function NotificationsPanel({
 }) {
   return (
     <>
-      {/* Overlay para cerrar al hacer click afuera */}
       <button
         className="fixed inset-0 z-40 cursor-default"
         aria-label="Cerrar notificaciones"
@@ -85,11 +84,7 @@ function NotificationsPanel({
 }
 
 function UserAvatar({ fotoUrl, size = 'h-9 w-9' }: { fotoUrl?: string; size?: string }) {
-  // La URL firmada de Supabase vence a la hora; si expiró (o cualquier otro
-  // error de carga), en vez de mostrarse rota/en blanco se cae a las
-  // iniciales, igual que cuando no hay foto. El reset de "fallaCarga" cuando
-  // cambia fotoUrl se hace durante el render (patrón recomendado por React
-  // para ajustar estado ante cambios de props), no en un efecto.
+
   const [fallaCarga, setFallaCarga] = useState(false)
   const [fotoUrlAnterior, setFotoUrlAnterior] = useState(fotoUrl)
   if (fotoUrl !== fotoUrlAnterior) {
@@ -134,13 +129,6 @@ interface AppShellProps {
   children: ReactNode
 }
 
-/**
- * Layout compartido para todas las pantallas autenticadas (Panel,
- * Calendario, Reservas, Clientes, Canchas, Ajustes). En desktop:
- * Sidebar de navegación + barra superior con buscador. En mobile:
- * header oscuro con logo/notificaciones/usuario + barra de
- * navegación inferior fija.
- */
 export default function AppShell({
   searchPlaceholder = 'Buscar reservas o clientes...',
   showSearch = true,
@@ -164,12 +152,7 @@ export default function AppShell({
     <div className="min-h-screen flex bg-neutral-50 dark:bg-neutral-900">
       <Sidebar />
 
-      {/* Contenido */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header oscuro (solo mobile). Versión compacta (sin
-            mobileHero, ej. Calendario) vs. versión completa con
-            saludo del día (ej. Panel). Ya es oscuro en claro y en
-            oscuro (mismo navy de marca), por eso casi no lleva dark:. */}
         {minimalMobile ? null : mobileHero ? (
           <header className="md:hidden bg-[#0F172A] text-white rounded-b-3xl px-5 pt-5 pb-6">
             <div className="flex items-center justify-between">
@@ -285,7 +268,6 @@ export default function AppShell({
           </header>
         )}
 
-        {/* Barra superior (solo desktop) */}
         <header className="hidden md:flex items-center gap-4 px-8 py-4 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
           {showSearch && (
             <div className="relative flex-1 max-w-md">
@@ -356,7 +338,6 @@ export default function AppShell({
         </main>
       </div>
 
-      {/* Barra de navegación inferior (solo mobile) */}
       {!minimalMobile && (
         <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 flex items-stretch z-30">
           {MOBILE_NAV_ITEMS.map(({ to, label, icon: Icon }) => (

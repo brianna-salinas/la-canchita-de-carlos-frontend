@@ -244,10 +244,10 @@ export default function PanelPage() {
         </h1>
       }
     >
-      <h1 className="hidden md:block font-sans font-bold text-4xl text-neutral-900 dark:text-neutral-50">
+      <h1 className="hidden md:block font-sans font-bold text-4xl text-neutral-900 dark:text-neutral-50 animate-fade-in-up">
         Hoy, {hoy}
       </h1>
-      <p className="hidden md:block font-sans text-base text-neutral-500 dark:text-neutral-400 mt-1">
+      <p className="hidden md:block font-sans text-base text-neutral-500 dark:text-neutral-400 mt-1 animate-fade-in-up">
         Bienvenido de nuevo, {user?.username ?? 'administrador'}. {dayPhrase(resumen.totalBookings)}
       </p>
 
@@ -258,9 +258,11 @@ export default function PanelPage() {
         </p>
       )}
 
-      {/* Tarjetas de resumen */}
       <div className="grid grid-cols-3 gap-3 md:gap-5 mt-5 md:mt-8">
-        <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3 md:p-5">
+        <div
+          className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3 md:p-5 animate-fade-in-up"
+          style={{ animationDelay: '40ms' }}
+        >
           <div className="flex items-start justify-between">
             <p className="font-sans text-xs md:uppercase md:tracking-wide text-neutral-500 dark:text-neutral-400">
               Alquileres
@@ -275,7 +277,10 @@ export default function PanelPage() {
           <p className="hidden md:block font-sans text-sm text-neutral-500 dark:text-neutral-400 mt-1">hoy</p>
         </div>
 
-        <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3 md:p-5">
+        <div
+          className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3 md:p-5 animate-fade-in-up"
+          style={{ animationDelay: '90ms' }}
+        >
           <div className="flex items-start justify-between">
             <p className="font-sans text-xs md:uppercase md:tracking-wide text-neutral-500 dark:text-neutral-400">
               Ingreso hoy
@@ -300,7 +305,10 @@ export default function PanelPage() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3 md:p-5">
+        <div
+          className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3 md:p-5 animate-fade-in-up"
+          style={{ animationDelay: '140ms' }}
+        >
           <div className="flex items-start justify-between">
             <p className="font-sans text-xs md:uppercase md:tracking-wide text-neutral-500 dark:text-neutral-400">
               Pendiente
@@ -318,7 +326,6 @@ export default function PanelPage() {
         </div>
       </div>
 
-      {/* ---------- MOBILE: apilado en una sola columna ---------- */}
       <div className="md:hidden mt-5 space-y-6">
         <SiguienteHorarioCard proximaLibre={proximaLibre ?? null} onReservar={reservarProximaLibre} />
 
@@ -358,17 +365,11 @@ export default function PanelPage() {
           </div>
         </div>
 
-        <div>
-          <h2 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50 mb-3">
-            Ocupación Semanal
-          </h2>
-          <OcupacionCard ocupacion={ocupacionSemanal} />
-        </div>
+        <OcupacionCard ocupacion={ocupacionSemanal} />
 
         <AvisoCard bloqueosHoy={bloqueosHoy} />
       </div>
 
-      {/* ---------- DESKTOP: tabla + columna lateral ---------- */}
       <div className="hidden md:grid grid-cols-3 gap-5 mt-6">
         <div className="col-span-2 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5">
           <div className="flex items-center justify-between mb-4">
@@ -493,7 +494,6 @@ export default function PanelPage() {
           </table>
         </div>
 
-        {/* Columna lateral */}
         <div className="space-y-5">
           <SiguienteHorarioCard proximaLibre={proximaLibre ?? null} onReservar={reservarProximaLibre} />
           <OcupacionCard ocupacion={ocupacionSemanal} />
@@ -533,14 +533,18 @@ export default function PanelPage() {
         Desarrollado por Brianna Salinas | 2026
       </p>
 
-      {/* Botón flotante de acción rápida (solo mobile) */}
-      <button
-        aria-label="Nueva reserva"
-        onClick={() => navigate('/calendario/nueva-reserva')}
-        className="md:hidden fixed bottom-24 right-5 h-14 w-14 rounded-full bg-brand-primary text-white shadow-lg flex items-center justify-center z-30"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
+      <div className="md:hidden group fixed bottom-24 right-5 z-30">
+        <span className="pointer-events-none absolute right-full top-1/2 -translate-y-1/2 mr-3 whitespace-nowrap rounded-full bg-neutral-900 dark:bg-neutral-700 text-white font-sans text-sm font-medium px-4 py-2 shadow-lg opacity-0 translate-x-2 transition-all duration-200 ease-out group-hover:opacity-100 group-hover:translate-x-0">
+          Nueva reserva
+        </span>
+        <button
+          aria-label="Nueva reserva"
+          onClick={() => navigate('/calendario/nueva-reserva')}
+          className="h-14 w-14 rounded-full bg-brand-primary text-white shadow-lg flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </div>
     </AppShell>
   )
 }

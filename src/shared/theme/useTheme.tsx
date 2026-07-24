@@ -28,12 +28,6 @@ function aplicarClase(theme: Theme) {
   document.documentElement.classList.toggle('dark', theme === 'dark')
 }
 
-/**
- * Tema global de la app (claro/oscuro). Prioriza lo que el usuario
- * eligió a mano (guardado en localStorage) sobre la preferencia del
- * sistema operativo, y solo cae a esta última la primera vez que
- * alguien entra sin haber tocado el botón nunca.
- */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     const guardado = leerPreferenciaGuardada()
@@ -50,8 +44,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       try {
         localStorage.setItem(STORAGE_KEY, nuevo)
       } catch {
-        // localStorage no disponible: el tema no persiste entre
-        // recargas, pero sigue funcionando en la sesión actual.
+
       }
       return nuevo
     })

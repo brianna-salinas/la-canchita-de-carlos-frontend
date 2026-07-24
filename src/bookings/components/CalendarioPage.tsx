@@ -42,7 +42,6 @@ function FranjaHoraria({ hora }: { hora: string }) {
   )
 }
 
-// Genera la lista de horas en punto entre `open` y `close` (ambos "HH:MM").
 function generateHours(open: string, close: string): string[] {
   const startH = hourToNum(open)
   const endH = hourToNum(close)
@@ -100,7 +99,7 @@ type CellState =
 function estaFueraDeHorarioDeLaCancha(cancha: Court, hora: string): boolean {
   const open = cancha.openTime
   const close = cancha.closeTime
-  if (!open || !close) return false // sin horario configurado = abierta 24h
+  if (!open || !close) return false
   return hora < open || hora >= close
 }
 
@@ -140,13 +139,13 @@ function Cell({
 
   if (estado.tipo === 'libre') {
     return (
-      <div className="group relative w-full h-full min-h-14 md:min-h-[76px] rounded-lg bg-neutral-50 dark:bg-neutral-900 md:bg-brand-secondary/10 border-0 md:border md:border-brand-secondary/40 flex items-center justify-center md:justify-between text-left overflow-hidden">
+      <div className="group relative w-full h-full min-h-14 md:min-h-[76px] rounded-lg bg-brand-secondary/10 border border-brand-secondary/40 flex items-center justify-center md:justify-between text-left overflow-hidden">
         <button
           type="button"
           onClick={onReservar}
           className="flex-1 h-full p-2 flex items-center justify-center md:justify-start text-left"
         >
-          <span className="font-sans text-xs md:text-[11px] font-medium md:font-semibold text-neutral-400 dark:text-neutral-500 md:text-brand-primary md:uppercase">
+          <span className="font-sans text-xs md:text-[11px] font-medium md:font-semibold text-brand-primary uppercase">
             Libre
           </span>
         </button>
@@ -412,7 +411,6 @@ export default function CalendarioPage() {
 
   return (
     <AppShell showSearch={false}>
-      {/* Encabezado desktop: navegación de fecha + vista + nueva reserva */}
       <div className="hidden md:flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
           <button
@@ -459,8 +457,6 @@ export default function CalendarioPage() {
             ))}
           </div>
 
-          {/* Filtro "mis calendarios": elegir qué canchas se muestran,
-              como el selector de calendarios visibles de Google Calendar. */}
           <div className="relative" ref={filtroRef}>
             <button
               onClick={() => setFiltroAbierto((v) => !v)}
@@ -515,7 +511,6 @@ export default function CalendarioPage() {
         </div>
       </div>
 
-      {/* Encabezado mobile: tarjeta oscura de fecha + toggle de vista full-width */}
       <div className="md:hidden space-y-4">
         <div className="bg-[#0F172A] rounded-2xl px-4 py-4 flex items-center justify-between">
           <button
@@ -559,8 +554,6 @@ export default function CalendarioPage() {
 
       {vista === 'semana' ? (
         <>
-          {/* Resumen de días: total de reservas + recaudación, con acceso
-              directo a la vista de Día de cada uno. */}
           <div className="mt-6 grid grid-cols-7 gap-2">
             {getWeekDates(fecha).map((dia) => {
               const iso = toISODate(dia)
@@ -599,9 +592,6 @@ export default function CalendarioPage() {
             })}
           </div>
 
-          {/* Grilla hora x día: mismo criterio de color que la vista de Día
-              (libre/pagado/debe), agregando todas las canchas por celda, más
-              un estado "pasado" para fechas ya transcurridas sin reserva. */}
           <div className="mt-4 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 overflow-x-auto">
             <div style={{ minWidth: '760px' }}>
               <div
@@ -643,9 +633,7 @@ export default function CalendarioPage() {
                   </div>
                   {getWeekDates(fecha).map((dia) => {
                     const iso = toISODate(dia)
-                    // Antes la vista Semana solo revisaba reservas: un
-                    // bloqueo por mantenimiento no se veía para nada acá
-                    // (solo en la vista Día).
+
                     const bloqueoActivo = bloqueosSemana.some(
                       (b) => b.date === iso && idsVisibles.has(b.courtId) && b.time === hora,
                     )
@@ -793,7 +781,6 @@ export default function CalendarioPage() {
         </div>
       ) : (
         <>
-          {/* Grilla del día */}
           {canchasVisibles.length === 0 && !cargando ? (
             <p className="mt-6 font-sans text-sm text-neutral-400 dark:text-neutral-500 text-center py-8 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700">
               {canchas.length === 0
@@ -859,7 +846,6 @@ export default function CalendarioPage() {
           </div>
           )}
 
-          {/* Referencias */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 font-sans text-xs text-neutral-500 dark:text-neutral-400">
             <span className="font-semibold text-neutral-600 dark:text-neutral-300">REFERENCIAS:</span>
             <span className="flex items-center gap-1.5">
@@ -888,7 +874,6 @@ export default function CalendarioPage() {
             </span>
           </div>
 
-          {/* Tarjetas de resumen del día */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
             <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3">
               <span className="h-11 w-11 rounded-xl bg-brand-secondary/20 flex items-center justify-center shrink-0">
@@ -947,7 +932,6 @@ export default function CalendarioPage() {
             </div>
           </div>
 
-          {/* Acciones inferiores (solo mobile) */}
           <p className="md:hidden text-center font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-8">
             Desarrollado por Brianna Salinas | 2026
           </p>

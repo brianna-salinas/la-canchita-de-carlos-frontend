@@ -7,7 +7,6 @@ export interface Customer {
   phone: string
   documentNumber?: string
   status?: 'ACTIVE' | 'INACTIVE'
-  photoUrl?: string
 }
 
 interface CustomerApiRow {
@@ -16,7 +15,6 @@ interface CustomerApiRow {
   phone: string
   documentNumber?: string | null
   status?: string
-  photoUrl?: string | null
 }
 
 function mapCustomerRow(row: CustomerApiRow): Customer {
@@ -26,7 +24,6 @@ function mapCustomerRow(row: CustomerApiRow): Customer {
     phone: row.phone,
     documentNumber: row.documentNumber ?? undefined,
     status: row.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
-    photoUrl: row.photoUrl ?? undefined,
   }
 }
 

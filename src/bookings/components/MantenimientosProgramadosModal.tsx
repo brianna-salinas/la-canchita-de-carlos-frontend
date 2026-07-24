@@ -81,10 +81,10 @@ export default function MantenimientosProgramadosModal({
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/40 md:px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-neutral-800 w-full max-w-md max-h-[88vh] md:max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 md:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-6"
+        className="bg-white dark:bg-neutral-800 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-5 md:p-6"
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 min-w-0">

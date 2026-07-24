@@ -2,12 +2,6 @@ import { Link } from 'react-router-dom'
 import { CircleCheck, CalendarCheck, LineChart } from 'lucide-react'
 import AuthLayout, { AuthFooter } from './AuthLayout'
 
-/**
- * Pantalla de confirmación tras enviar una solicitud de acceso
- * (US20). Antes de esta pantalla, RequestAccessPage navegaba a una
- * ruta que no existía ("/solicitud-enviada"), dejando al usuario en
- * una página en blanco después de enviar el formulario.
- */
 export default function SolicitudEnviadaPage() {
   return (
     <AuthLayout

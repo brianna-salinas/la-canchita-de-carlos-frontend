@@ -72,18 +72,16 @@ export default function ReservasPage() {
   const [fechaFin, setFechaFin] = useState('')
   const [canchaFiltro, setCanchaFiltro] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState('')
-  // Prefill desde "Historial" en Clientes: /reservas?cliente=Nombre
+
   const [busqueda, setBusqueda] = useState(searchParams.get('cliente') ?? '')
   const [chipActivo, setChipActivo] = useState('todos')
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
   const [seleccionadas, setSeleccionadas] = useState<Set<number>>(new Set())
   const [confirmando, setConfirmando] = useState(false)
-  // Chip "Recurrentes / Series": muestra solo reservas que forman
-  // parte de una serie (tipoReserva MULTIDIA o RECURRENTE).
+
   const [soloSeries, setSoloSeries] = useState(false)
   const [marcandoSerie, setMarcandoSerie] = useState<string | null>(null)
-  // Antes de ejecutar un pago (individual o de serie) se pregunta el método
-  // con este modal; pagoPendiente guarda qué acción ejecutar una vez elegido.
+
   const [pagoPendiente, setPagoPendiente] = useState<PagoPendiente | null>(null)
   const [procesandoPago, setProcesandoPago] = useState(false)
 
@@ -271,7 +269,6 @@ export default function ReservasPage() {
       onSearchChange={setBusqueda}
       minimalMobile
     >
-      {/* Barra superior mobile */}
       <div className="md:hidden sticky top-0 z-20 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} aria-label="Volver" className="text-neutral-900 dark:text-neutral-50">
@@ -288,7 +285,6 @@ export default function ReservasPage() {
         </button>
       </div>
 
-      {/* ================= MOBILE ================= */}
       <div className="md:hidden px-4 py-4 pb-28 space-y-4 bg-neutral-50 dark:bg-neutral-900 min-h-screen">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 dark:text-neutral-500" />
@@ -477,7 +473,6 @@ export default function ReservasPage() {
         </p>
       </div>
 
-      {/* Botones flotantes (solo mobile) */}
       <div className="md:hidden fixed bottom-24 right-5 flex flex-col gap-3 z-20">
         {seleccionadas.size > 0 && (
           <button
@@ -498,7 +493,6 @@ export default function ReservasPage() {
         </button>
       </div>
 
-      {/* ================= DESKTOP ================= */}
       <div className="hidden md:flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-sans font-bold text-3xl text-neutral-900 dark:text-neutral-50">
@@ -528,7 +522,6 @@ export default function ReservasPage() {
         </div>
       </div>
 
-      {/* Filtros (desktop) */}
       <div className="hidden md:flex bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5 mt-6 flex-wrap items-end gap-4">
         <div>
           <label className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mb-1 block">
@@ -600,7 +593,6 @@ export default function ReservasPage() {
         </p>
       )}
 
-      {/* Tabla (desktop) */}
       <div className="hidden md:block bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 mt-6 overflow-x-auto">
         <table className="w-full min-w-[820px]">
           <thead>
@@ -735,12 +727,12 @@ export default function ReservasPage() {
 
       {pagoPendiente && (
         <div
-          className="fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/40 md:px-4"
+          className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/40"
           onClick={() => !procesandoPago && setPagoPendiente(null)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-neutral-800 w-full max-w-sm rounded-t-2xl md:rounded-2xl p-5 md:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-6"
+            className="bg-white dark:bg-neutral-800 w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-2xl p-5 md:p-6"
           >
             <h2 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50 mb-1">
               ¿Cómo pagó el cliente?

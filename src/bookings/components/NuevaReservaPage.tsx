@@ -132,7 +132,6 @@ export default function NuevaReservaPage() {
   const [horaInicio, setHoraInicio] = useState('10:00')
   const [horaFin, setHoraFin] = useState('11:00')
 
-
   const [tipoReserva, setTipoReserva] = useState<TipoReserva>('UNICA')
   const [fechaFinMultidia, setFechaFinMultidia] = useState('')
   const [repeticiones, setRepeticiones] = useState(4)
@@ -173,7 +172,6 @@ export default function NuevaReservaPage() {
     const reserva = reservas.find((r) => String(r.id) === id)
     if (!reserva) return
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCanchaId(reserva.courtId)
     setFecha(reserva.date)
     setHoraInicio(reserva.startTime)
@@ -212,7 +210,6 @@ export default function NuevaReservaPage() {
     const fechaParam = searchParams.get('fecha')
     const horaParam = searchParams.get('horaInicio')
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (canchaIdParam) setCanchaId(Number(canchaIdParam))
     if (fechaParam) setFecha(fechaParam)
     if (horaParam) {
@@ -432,7 +429,6 @@ export default function NuevaReservaPage() {
           ? generarFechasMultidia(fecha, fechaFinMultidia)
           : generarFechasRecurrentes(fecha, repeticiones)
 
-
       const ocupadas = fechas.filter((f) =>
         reservas.some(
           (r) => r.courtId === canchaSeleccionada.id && r.date === f && horaInicio < r.endTime && horaFin > r.startTime,
@@ -484,8 +480,6 @@ export default function NuevaReservaPage() {
 
   return (
     <AppShell searchPlaceholder="Buscar reservas o clientes..." minimalMobile>
-      {/* Barra superior mobile: solo flecha + título, sin el chrome
-          habitual de AppShell (este es un flujo de pantalla completa). */}
       <div className="md:hidden sticky top-0 z-20 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 px-4 py-4 flex items-center gap-3">
         <Link to="/calendario" aria-label="Volver" className="text-neutral-900 dark:text-neutral-50">
           <ArrowLeft className="h-5 w-5" />
@@ -496,9 +490,7 @@ export default function NuevaReservaPage() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        {/* ================= MOBILE ================= */}
-        <div className="md:hidden px-4 py-4 pb-28 space-y-4 bg-neutral-50 dark:bg-neutral-900 min-h-screen">
-          {/* 1. Seleccionar cancha */}
+        <div className="md:hidden px-4 py-4 pb-[calc(6rem+env(safe-area-inset-bottom))] space-y-4 bg-neutral-50 dark:bg-neutral-900 min-h-screen">
           <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="h-6 w-6 rounded-full bg-brand-primary text-white font-sans text-xs font-bold flex items-center justify-center shrink-0">
@@ -553,7 +545,6 @@ export default function NuevaReservaPage() {
             </div>
           </div>
 
-          {/* 2. Información de reserva */}
           <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="h-6 w-6 rounded-full bg-neutral-800 text-white font-sans text-xs font-bold flex items-center justify-center shrink-0">
@@ -719,14 +710,13 @@ export default function NuevaReservaPage() {
             )}
           </div>
 
-          {/* 3. Customer */}
           <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <span className="h-6 w-6 rounded-full bg-neutral-800 text-white font-sans text-xs font-bold flex items-center justify-center shrink-0">
                   3
                 </span>
-                <h2 className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50">Customer</h2>
+                <h2 className="font-sans font-bold text-base text-neutral-900 dark:text-neutral-50">Cliente</h2>
               </div>
               <button
                 type="button"
@@ -787,7 +777,6 @@ export default function NuevaReservaPage() {
             )}
           </div>
 
-          {/* 4. Detalles de pago */}
           <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="h-6 w-6 rounded-full bg-neutral-800 text-white font-sans text-xs font-bold flex items-center justify-center shrink-0">
@@ -875,7 +864,6 @@ export default function NuevaReservaPage() {
             )}
           </div>
 
-          {/* 5. Comprobante */}
           <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="h-6 w-6 rounded-full bg-neutral-800 text-white font-sans text-xs font-bold flex items-center justify-center shrink-0">
@@ -906,8 +894,7 @@ export default function NuevaReservaPage() {
           </p>
         </div>
 
-        {/* Botón fijo inferior (solo mobile) */}
-        <div className="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 p-4 z-20">
+        <div className="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] z-20">
           <button
             type="submit"
             disabled={guardando}
@@ -923,7 +910,6 @@ export default function NuevaReservaPage() {
           </button>
         </div>
 
-        {/* ================= DESKTOP ================= */}
         <div className="hidden md:block">
           <div className="flex items-center gap-1.5 font-sans text-sm text-neutral-500 dark:text-neutral-400">
             <Link to="/calendario" className="hover:text-brand-primary">
@@ -946,7 +932,6 @@ export default function NuevaReservaPage() {
         </div>
 
         <div className="hidden md:block mt-6 space-y-6">
-          {/* 1. Seleccionar cancha */}
           <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-sans font-bold text-sm text-brand-primary uppercase tracking-wide">
@@ -1015,7 +1000,6 @@ export default function NuevaReservaPage() {
         </section>
 
         <div className="grid md:grid-cols-2 gap-5">
-          {/* 2. Información de reserva */}
           <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5">
             <h2 className="font-sans font-bold text-sm text-brand-primary uppercase tracking-wide pb-3 mb-4 border-b border-neutral-100 dark:border-neutral-700/60">
               2. Información de Reserva
@@ -1178,11 +1162,10 @@ export default function NuevaReservaPage() {
             )}
           </div>
 
-          {/* 3. Información del cliente */}
           <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-neutral-100 dark:border-neutral-700/60">
               <h2 className="font-sans font-bold text-sm text-brand-primary uppercase tracking-wide">
-                3. Información del Customer
+                3. Información del cliente
               </h2>
               <button
                 type="button"
@@ -1195,7 +1178,7 @@ export default function NuevaReservaPage() {
             </div>
 
             <label className="font-sans text-sm text-neutral-600 dark:text-neutral-300 mb-1 block">
-              Buscar Customer (DNI / Nombre)
+              Buscar cliente (DNI / Nombre)
             </label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 dark:text-neutral-500" />
@@ -1256,7 +1239,6 @@ export default function NuevaReservaPage() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-5">
-          {/* 4. Detalles de pago */}
           <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5">
             <h2 className="font-sans font-bold text-sm text-brand-primary uppercase tracking-wide pb-3 mb-4 border-b border-neutral-100 dark:border-neutral-700/60">
               4. Detalles de Pago
@@ -1340,7 +1322,6 @@ export default function NuevaReservaPage() {
             )}
           </div>
 
-          {/* 5. Comprobante de pago */}
           <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5">
             <h2 className="font-sans font-bold text-sm text-brand-primary uppercase tracking-wide pb-3 mb-4 border-b border-neutral-100 dark:border-neutral-700/60">
               5. Comprobante de Pago
@@ -1365,7 +1346,6 @@ export default function NuevaReservaPage() {
           </p>
         )}
 
-        {/* Pie: cancelar + resumen + guardar */}
         <div className="flex items-center justify-between border-t border-neutral-200 dark:border-neutral-700 pt-5">
           <Link
             to={editando ? '/reservas' : '/calendario'}
@@ -1402,8 +1382,6 @@ export default function NuevaReservaPage() {
         </div>
       </form>
 
-      {/* Modal: registrar cliente nuevo real (POST /customers), para no permitir
-          reservas "a nombre de" alguien que no existe como Customer. */}
       {modalClienteAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-800 p-6 shadow-lg">

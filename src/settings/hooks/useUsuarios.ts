@@ -7,7 +7,7 @@ export interface AdminUser {
   email: string
   isOwner: boolean
   status: 'ACTIVE' | 'INACTIVE'
-  /** ISO timestamp del último acceso, usado para el "Activo hace Xh". */
+
   lastAccess?: string
   photoUrl?: string
 }

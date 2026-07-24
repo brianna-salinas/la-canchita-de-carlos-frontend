@@ -22,7 +22,7 @@ export default function LoginPage() {
       await login(usuario, password)
       navigate('/panel')
     } catch {
-      // US01, Escenario 2: credenciales inválidas rechazadas
+
       setError('Usuario o contraseña incorrectos.')
     } finally {
       setLoading(false)
@@ -52,10 +52,7 @@ export default function LoginPage() {
         </>
       }
     >
-      {/* En mobile todo (logo + form) va dentro de una sola tarjeta,
-          igual que el mockup. En desktop la tarjeta queda solo
-          alrededor del formulario, como ya estaba. */}
-      <div className="bg-white dark:bg-neutral-900 rounded-3xl shadow-md dark:shadow-none p-6 sm:p-8 md:bg-transparent md:shadow-none md:rounded-none md:p-0">
+      <div className="bg-white dark:bg-neutral-900 rounded-3xl shadow-md dark:shadow-none p-6 sm:p-8 md:bg-transparent md:shadow-none md:rounded-none md:p-0 animate-fade-in-up">
         <div className="flex flex-col items-center text-center mb-6">
           <img
             src="/assets/logo.png"
@@ -72,9 +69,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Card / marco que envuelve todo el formulario (solo visible
-            como borde propio en desktop; en mobile ya está dentro de
-            la tarjeta de arriba). */}
         <div className="md:rounded-2xl md:border md:border-neutral-200 dark:md:border-neutral-700 md:shadow-sm md:p-6">
           <h2 className="font-sans font-bold text-2xl text-neutral-900 dark:text-neutral-50 text-center mb-5">
             Inicia sesión
@@ -146,7 +140,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-lg bg-brand-primary dark:bg-brand-secondary text-white dark:text-neutral-900 font-sans font-semibold text-base hover:bg-brand-primary/90 dark:hover:bg-brand-secondary/90 transition-colors disabled:opacity-60"
+              className="w-full h-12 rounded-lg bg-brand-primary dark:bg-brand-secondary text-white dark:text-neutral-900 font-sans font-semibold text-base hover:bg-brand-primary/90 dark:hover:bg-brand-secondary/90 transition-all duration-150 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:hover:scale-100"
             >
               {loading ? 'Ingresando...' : 'Ingresar'}
             </button>

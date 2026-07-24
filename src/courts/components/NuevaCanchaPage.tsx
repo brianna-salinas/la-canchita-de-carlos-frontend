@@ -55,7 +55,7 @@ export default function NuevaCanchaPage() {
     if (!editando || !id) return
     const cancha = canchas.find((c) => String(c.id) === id)
     if (cancha) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+
       setForm({
         nombre: cancha.name,
         deporte: cancha.sport,
@@ -166,7 +166,6 @@ export default function NuevaCanchaPage() {
 
   return (
     <AppShell searchPlaceholder="Buscar canchas, reservas o socios..." minimalMobile>
-      {/* Barra superior mobile */}
       <div className="md:hidden sticky top-0 z-20 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 px-4 py-4 flex items-center gap-3">
         <button onClick={() => navigate(-1)} aria-label="Volver" className="text-neutral-900 dark:text-neutral-50">
           <ArrowLeft className="h-5 w-5" />
@@ -174,8 +173,7 @@ export default function NuevaCanchaPage() {
         <h1 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50">{tituloMobile}</h1>
       </div>
 
-      {/* ================= MOBILE ================= */}
-      <div className="md:hidden px-4 py-4 pb-32 space-y-4 bg-neutral-50 dark:bg-neutral-900 min-h-screen">
+      <div className="md:hidden px-4 py-4 pb-[calc(9rem+env(safe-area-inset-bottom))] space-y-4 bg-neutral-50 dark:bg-neutral-900 min-h-screen">
         <label className="block bg-white dark:bg-neutral-800 rounded-2xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 py-8 text-center cursor-pointer overflow-hidden">
           <input
             type="file"
@@ -341,7 +339,7 @@ export default function NuevaCanchaPage() {
         </p>
       </div>
 
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 p-4 space-y-2 z-20">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-2 z-20">
         <button
           onClick={handleSubmit}
           disabled={guardando}
@@ -357,7 +355,6 @@ export default function NuevaCanchaPage() {
         </button>
       </div>
 
-      {/* ================= DESKTOP ================= */}
       <div className="hidden md:block">
         <div className="flex items-center justify-between">
           <div>

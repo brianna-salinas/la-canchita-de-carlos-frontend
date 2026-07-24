@@ -196,7 +196,6 @@ export default function AjustesPage() {
         onChange={(e) => subirFoto(e.target.files?.[0])}
       />
 
-      {/* ================= MOBILE ================= */}
       <div className="md:hidden pb-6">
         <p className="font-sans text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-3">
           Información Personal
@@ -281,10 +280,6 @@ export default function AjustesPage() {
             </span>
             <ChevronRight className="h-4 w-4 text-neutral-300 shrink-0" />
           </button>
-          {/* Solo el dueño (Carlos) administra accesos: aprobar/rechazar
-              solicitudes es una accion que el backend ya protege con
-              requireOwner, pero antes el boton se mostraba a cualquier
-              administrador y les daba un 403 al tocarlo. */}
           {user?.isOwner && (
             <button
               onClick={() => navigate('/ajustes/solicitudes')}
@@ -336,9 +331,7 @@ export default function AjustesPage() {
         </p>
       </div>
 
-      {/* ================= DESKTOP ================= */}
       <div className="hidden md:grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-5 mt-6">
-        {/* Información Personal */}
         <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden grid grid-cols-1 sm:grid-cols-[220px_1fr]">
           <div className="bg-neutral-50 dark:bg-neutral-900 flex flex-col items-center justify-center gap-3 p-8 border-b sm:border-b-0 sm:border-r border-neutral-100 dark:border-neutral-700/60">
             <div className="relative">
@@ -402,7 +395,6 @@ export default function AjustesPage() {
           </div>
         </div>
 
-        {/* Seguridad y Datos */}
         <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-6">
           <p className="font-sans text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-4">
             Seguridad y Datos
@@ -436,10 +428,6 @@ export default function AjustesPage() {
         </div>
       </div>
 
-      {/* Administración (desktop) — solo el dueño (Carlos) ve esto. Antes
-          se mostraba a cualquier administrador aunque el backend ya
-          bloquea GET/PATCH de solicitudes con requireOwner, asi que un
-          admin no-dueño solo se topaba con un 403 al entrar. */}
       {user?.isOwner && (
       <div className="hidden md:block bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 mt-5">
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 dark:border-neutral-700/60">
@@ -501,7 +489,6 @@ export default function AjustesPage() {
       </div>
       )}
 
-      {/* Zona de Peligro */}
       <div className="hidden md:flex bg-danger/5 border border-danger/20 rounded-2xl mt-5 p-6 flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <p className="flex items-center gap-2 font-sans font-bold text-lg text-danger">
@@ -520,18 +507,15 @@ export default function AjustesPage() {
         </button>
       </div>
 
-      {/* Modal editar perfil / usuario / correo / contraseña */}
       {modo && (
         <div
-          className="fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/40 md:px-4"
+          className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/40"
           onClick={() => setModo(null)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-neutral-800 w-full max-w-md max-h-[88vh] md:max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 md:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-6"
+            className="bg-white dark:bg-neutral-800 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-5 md:p-6"
           >
-            <div className="md:hidden w-10 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 mx-auto mb-4" />
-
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50">{tituloModal}</h2>
               <button onClick={() => setModo(null)} aria-label="Cerrar">
@@ -628,17 +612,15 @@ export default function AjustesPage() {
         </div>
       )}
 
-      {/* Modal Eliminar Cuenta */}
       {eliminarModalAbierto && (
         <div
-          className="fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/40 md:px-4"
+          className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/40"
           onClick={() => setEliminarModalAbierto(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-neutral-800 w-full max-w-md rounded-t-2xl md:rounded-2xl p-5 md:p-6"
+            className="bg-white dark:bg-neutral-800 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-5 md:p-6"
           >
-            <div className="md:hidden w-10 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 mx-auto mb-4" />
             <p className="flex items-center gap-2 font-sans font-bold text-lg text-danger">
               <TriangleAlert className="h-5 w-5" />
               Eliminar cuenta

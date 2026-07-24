@@ -48,12 +48,11 @@ export default function RequestAccessPage() {
 
     setLoading(true)
     try {
-      // US20, Escenario 1: solicitud creada en estado pendiente
+
       await requestAccess({ name: nombre, email: correo, phone: telefono, password })
       navigate('/solicitud-enviada')
     } catch (err) {
-      // US20, Escenario 2: correo ya registrado (o cualquier otro rechazo
-      // del backend, mostrando su mensaje real en vez de uno genérico).
+
       setError(getApiErrorMessage(err, 'No se pudo enviar la solicitud. Intenta de nuevo.'))
     } finally {
       setLoading(false)
@@ -107,8 +106,6 @@ export default function RequestAccessPage() {
         Volver
       </Link>
 
-      {/* Marca visible solo en mobile (en desktop ya está en el panel
-          izquierdo azul), mismo estilo que Login. */}
       <div className="flex md:hidden flex-col items-center text-center mb-6">
         <img
           src="/assets/logo.png"
@@ -122,9 +119,7 @@ export default function RequestAccessPage() {
         </h2>
       </div>
 
-      {/* En mobile, el formulario va dentro de una tarjeta blanca
-          (como el mockup). En desktop no lleva card, como ya estaba. */}
-      <div className="bg-white dark:bg-neutral-900 rounded-3xl shadow-md dark:shadow-none p-6 sm:p-8 md:bg-transparent md:shadow-none md:rounded-none md:p-0">
+      <div className="bg-white dark:bg-neutral-900 rounded-3xl shadow-md dark:shadow-none p-6 sm:p-8 md:bg-transparent md:shadow-none md:rounded-none md:p-0 animate-fade-in-up">
         <h1 className="font-sans font-bold text-2xl md:text-3xl text-neutral-900 dark:text-neutral-50 text-center md:text-left">
           Solicitar Acceso
         </h1>
@@ -212,7 +207,7 @@ export default function RequestAccessPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-12 rounded-lg bg-brand-primary dark:bg-brand-secondary text-white dark:text-neutral-900 font-sans font-semibold text-base hover:bg-brand-primary/90 dark:hover:bg-brand-secondary/90 transition-colors disabled:opacity-60"
+            className="w-full h-12 rounded-lg bg-brand-primary dark:bg-brand-secondary text-white dark:text-neutral-900 font-sans font-semibold text-base hover:bg-brand-primary/90 dark:hover:bg-brand-secondary/90 transition-all duration-150 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:hover:scale-100"
           >
             {loading ? 'Enviando...' : 'Solicitar acceso'}
           </button>

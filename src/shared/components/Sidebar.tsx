@@ -19,12 +19,6 @@ const NAV_ITEMS = [
   { to: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
 
-/**
- * Sidebar de navegación, compartido por todas las pantallas
- * autenticadas (Panel, Calendario, Reservas, Clientes, Canchas,
- * Ajustes). Vive en shared/ porque no pertenece a un solo bounded
- * context — lo usa cualquier pantalla que necesite el layout base.
- */
 export default function Sidebar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()

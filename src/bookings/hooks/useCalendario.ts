@@ -125,8 +125,7 @@ export function mapBookingRow(row: BookingApiRow): Booking {
     startTime: String(row.startTime).slice(11, 16),
     endTime: String(row.endTime).slice(11, 16),
     status: row.status,
-    // Se dejan tal como los manda el backend (PAID/PARTIAL/PENDING, etc.);
-    // la traducción a español se hace solo al renderizar.
+
     paymentStatus: (row.paymentStatus as Booking['paymentStatus']) ?? 'PENDING',
     totalAmount: row.totalAmount,
     paidAmount: row.paidAmount,
@@ -195,7 +194,7 @@ export function useScheduleBlocksRange(dates: string[]) {
 
 export interface ScheduleMaintenanceInput {
   courtId: number
-  /** YYYY-MM-DD, una por fecha de la serie (el frontend calcula la recurrencia). */
+
   dates: string[]
   startTime: string
   endTime: string

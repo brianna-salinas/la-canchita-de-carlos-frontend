@@ -7,12 +7,6 @@ interface AuthLayoutProps {
   rightBgClassName?: string
 }
 
-/**
- * Layout compartido para las pantallas públicas de autenticación
- * (Login y Solicitar Acceso): panel izquierdo de marca + panel
- * derecho con el formulario. En mobile, el panel izquierdo se
- * oculta y solo se muestra el formulario.
- */
 export default function AuthLayout({
   left,
   children,

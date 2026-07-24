@@ -47,9 +47,9 @@ function formatFechaCorta(iso: string): string {
 
 interface ProgramarMantenimientoModalProps {
   canchas: Court[]
-  /** Preselecciona la cancha (ej. abierto desde la ficha de esa cancha o desde una celda del Calendario). */
+
   canchaIdInicial?: number
-  /** Preselecciona fecha/hora (ej. abierto desde una celda "Libre" del Calendario). */
+
   fechaInicial?: string
   horaInicial?: string
   onClose: () => void
@@ -144,12 +144,12 @@ export default function ProgramarMantenimientoModal({
 
   return (
     <div
-      className="fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/40 md:px-4"
+      className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/40"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-neutral-800 w-full max-w-md max-h-[88vh] md:max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 md:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-6"
+        className="bg-white dark:bg-neutral-800 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-5 md:p-6"
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">

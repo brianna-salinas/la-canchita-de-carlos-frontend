@@ -215,7 +215,6 @@ export default function CanchasPage() {
 
   return (
     <AppShell showSearch={false}>
-      {/* ================= DESKTOP ================= */}
       <div className="hidden md:flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-sans font-bold text-3xl text-neutral-900 dark:text-neutral-50">
@@ -308,7 +307,6 @@ export default function CanchasPage() {
         </div>
       )}
 
-      {/* ================= MOBILE ================= */}
       <div className="md:hidden pb-24">
         <h1 className="font-sans font-bold text-2xl text-neutral-900 dark:text-neutral-50">Gestión de Canchas</h1>
 
@@ -441,10 +439,15 @@ export default function CanchasPage() {
         <Plus className="h-6 w-6" />
       </button>
 
-      {/* ================= MODAL: advertencia de borrado permanente ================= */}
       {canchaAEliminar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-danger/30 max-w-md w-full overflow-hidden shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setCanchaAEliminar(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-neutral-800 rounded-2xl border border-danger/30 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-xl"
+          >
             <div className="flex items-start gap-3 p-5 bg-danger/10">
               <span className="h-10 w-10 rounded-full bg-danger/20 text-danger flex items-center justify-center shrink-0">
                 <TriangleAlert className="h-5 w-5" />
@@ -487,18 +490,18 @@ export default function CanchasPage() {
                 desactiva &quot;Habilitada para reservas&quot;: eso se puede revertir cuando quieras.
               </p>
 
-              <div className="flex items-center justify-end gap-3 mt-5">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 mt-5">
                 <button
                   onClick={() => setCanchaAEliminar(null)}
                   disabled={eliminando}
-                  className="h-10 px-4 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans font-semibold text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700/60 disabled:opacity-60"
+                  className="h-11 sm:h-10 px-4 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans font-semibold text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700/60 disabled:opacity-60 w-full sm:w-auto"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={confirmarEliminarDefinitivo}
                   disabled={eliminando}
-                  className="h-10 px-4 rounded-lg bg-danger text-white font-sans font-semibold text-sm hover:bg-danger/90 disabled:opacity-60"
+                  className="h-11 sm:h-10 px-4 rounded-lg bg-danger text-white font-sans font-semibold text-sm hover:bg-danger/90 disabled:opacity-60 w-full sm:w-auto"
                 >
                   {eliminando ? 'Eliminando...' : 'Sí, eliminar para siempre'}
                 </button>
@@ -508,11 +511,13 @@ export default function CanchasPage() {
         </div>
       )}
 
-      {/* ================= MODAL: detalle de la cancha ================= */}
       {canchaDetalle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setCanchaDetalle(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setCanchaDetalle(null)}
+        >
           <div
-            className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 max-w-md w-full overflow-hidden shadow-xl"
+            className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className={`relative h-32 bg-gradient-to-br ${gradientePorId(canchaDetalle.id)} flex items-center justify-center`}>
@@ -577,10 +582,10 @@ export default function CanchasPage() {
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-3 mt-5">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 mt-5">
                 <button
                   onClick={() => setCanchaDetalle(null)}
-                  className="h-10 px-4 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans font-semibold text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700/60"
+                  className="h-11 sm:h-10 px-4 rounded-lg border border-neutral-200 dark:border-neutral-700 font-sans font-semibold text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700/60 w-full sm:w-auto"
                 >
                   Cerrar
                 </button>
@@ -590,7 +595,7 @@ export default function CanchasPage() {
                     setCanchaDetalle(null)
                     navigate(`/canchas/${id}/editar`)
                   }}
-                  className="h-10 px-4 rounded-lg bg-brand-primary text-white font-sans font-semibold text-sm hover:bg-brand-primary/90 flex items-center gap-2"
+                  className="h-11 sm:h-10 px-4 rounded-lg bg-brand-primary text-white font-sans font-semibold text-sm hover:bg-brand-primary/90 flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   <Pencil className="h-4 w-4" />
                   Editar

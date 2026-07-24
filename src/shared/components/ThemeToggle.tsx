@@ -1,11 +1,6 @@
 import { Sun, Moon } from 'lucide-react'
 import { useTheme } from '../theme/useTheme'
 
-/**
- * Botón sol/luna para alternar el tema de toda la app. Vive en
- * shared/ porque se usa tanto en AppShell (pantallas autenticadas)
- * como en AuthLayout (Login, Registro, etc.).
- */
 export default function ThemeToggle({ className = '' }: { className?: string }) {
   const { theme, toggleTheme } = useTheme()
 

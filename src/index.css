@@ -15,6 +15,39 @@
 
   --font-display: 'Lobster Two', cursive;
   --font-sans: 'Outfit', sans-serif;
+
+  --animate-fade-in-up: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.4s ease-out both;
+}
+
+/* Animaciones de entrada, usadas con moderación (pantallas de login,
+   registro y el panel inicial) para que la app se sienta más cuidada
+   sin volverse ruidosa. Respeta prefers-reduced-motion más abajo. */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up,
+  .animate-fade-in {
+    animation: none;
+  }
 }
 
 body {

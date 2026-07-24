@@ -19,11 +19,9 @@ export function setToken(token: string | null) {
     if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token)
     else localStorage.removeItem(TOKEN_STORAGE_KEY)
   } catch {
-    // localStorage no disponible (modo privado, etc.) — la sesión
-    // simplemente no persiste entre recargas.
+
   }
 }
-
 
 apiClient.interceptors.request.use((config) => {
   const token = getToken()
