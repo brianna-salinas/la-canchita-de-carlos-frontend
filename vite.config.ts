@@ -11,7 +11,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: {
         name: 'La Canchita de Carlos',
-        short_name: 'La Canchita',
+        short_name: 'La Canchita de Carlos',
         description: 'Gestión interna de alquiler de canchas',
         theme_color: '#2563EB',
         background_color: '#FFFFFF',

@@ -715,68 +715,70 @@ export default function CalendarioPage() {
           </div>
         </>
       ) : vista === 'mes' ? (
-        <div className="mt-6 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 md:p-6">
-          <div className="grid grid-cols-7 gap-2 mb-2">
-            {DIAS_CORTOS.map((d) => (
-              <p key={d} className="font-sans text-[11px] font-semibold uppercase text-neutral-400 dark:text-neutral-500 text-center">
-                {d}
-              </p>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-2">
-            {getMonthGrid(fecha).flatMap((semana) =>
-              semana.map((dia) => {
-                const iso = toISODate(dia)
-                const reservasDia = reservas.filter(
-                  (r) => r.date === iso && r.status !== 'CANCELLED' && idsVisibles.has(r.courtId),
-                )
-                const esMesActual = dia.getMonth() === fecha.getMonth()
-                const esHoyCol = iso === toISODate(new Date())
-                const esSeleccionado = iso === isoFecha
-                const MAX_VISIBLE = 2
-                const visibles = reservasDia.slice(0, MAX_VISIBLE)
-                const restantes = reservasDia.length - visibles.length
-                return (
-                  <button
-                    key={iso}
-                    onClick={() => irADia(dia)}
-                    className={`min-h-[72px] md:min-h-[92px] rounded-lg border p-1.5 md:p-2 flex flex-col items-start text-left transition-colors ${
-                      !esMesActual ? 'opacity-40' : ''
-                    } ${
-                      esSeleccionado
-                        ? 'border-brand-primary bg-brand-primary/10'
-                        : esHoyCol
-                          ? 'border-brand-secondary bg-brand-secondary/10'
-                          : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700/40'
-                    }`}
-                  >
-                    <span className="font-sans text-xs md:text-sm font-semibold text-neutral-900 dark:text-neutral-50">
-                      {dia.getDate()}
-                    </span>
-                    <div className="mt-1 w-full space-y-0.5">
-                      {visibles.map((r) => (
-                        <p
-                          key={r.id}
-                          title={`${r.customerName} - ${r.courtName} (${r.startTime}-${r.endTime})`}
-                          className={`w-full truncate rounded px-1 py-0.5 font-sans text-[9px] md:text-[10px] font-medium ${
-                            r.paymentStatus === 'PAID'
-                              ? 'bg-success/15 text-success'
-                              : 'bg-danger/15 text-danger'
-                          }`}
-                        >
-                          {r.customerName} - {r.courtName} ({r.startTime}-{r.endTime})
-                        </p>
-                      ))}
-                      {restantes > 0 && (
-                        <p className="font-sans text-[9px] md:text-[10px] text-neutral-400 dark:text-neutral-500 px-1">
-                          +{restantes} más
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                )
-              }),
-            )}
+        <div className="mt-6 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 md:p-6 overflow-x-auto">
+          <div style={{ minWidth: '672px' }}>
+            <div className="grid grid-cols-7 gap-2 mb-2">
+              {DIAS_CORTOS.map((d) => (
+                <p key={d} className="font-sans text-[11px] font-semibold uppercase text-neutral-400 dark:text-neutral-500 text-center">
+                  {d}
+                </p>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {getMonthGrid(fecha).flatMap((semana) =>
+                semana.map((dia) => {
+                  const iso = toISODate(dia)
+                  const reservasDia = reservas.filter(
+                    (r) => r.date === iso && r.status !== 'CANCELLED' && idsVisibles.has(r.courtId),
+                  )
+                  const esMesActual = dia.getMonth() === fecha.getMonth()
+                  const esHoyCol = iso === toISODate(new Date())
+                  const esSeleccionado = iso === isoFecha
+                  const MAX_VISIBLE = 2
+                  const visibles = reservasDia.slice(0, MAX_VISIBLE)
+                  const restantes = reservasDia.length - visibles.length
+                  return (
+                    <button
+                      key={iso}
+                      onClick={() => irADia(dia)}
+                      className={`min-h-[72px] md:min-h-[92px] rounded-lg border p-1.5 md:p-2 flex flex-col items-start text-left transition-colors ${
+                        !esMesActual ? 'opacity-40' : ''
+                      } ${
+                        esSeleccionado
+                          ? 'border-brand-primary bg-brand-primary/10'
+                          : esHoyCol
+                            ? 'border-brand-secondary bg-brand-secondary/10'
+                            : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700/40'
+                      }`}
+                    >
+                      <span className="font-sans text-xs md:text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+                        {dia.getDate()}
+                      </span>
+                      <div className="mt-1 w-full space-y-0.5">
+                        {visibles.map((r) => (
+                          <p
+                            key={r.id}
+                            title={`${r.customerName} - ${r.courtName} (${r.startTime}-${r.endTime})`}
+                            className={`w-full truncate rounded px-1 py-0.5 font-sans text-[9px] md:text-[10px] font-medium ${
+                              r.paymentStatus === 'PAID'
+                                ? 'bg-success/15 text-success'
+                                : 'bg-danger/15 text-danger'
+                            }`}
+                          >
+                            {r.customerName} - {r.courtName} ({r.startTime}-{r.endTime})
+                          </p>
+                        ))}
+                        {restantes > 0 && (
+                          <p className="font-sans text-[9px] md:text-[10px] text-neutral-400 dark:text-neutral-500 px-1">
+                            +{restantes} más
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  )
+                }),
+              )}
+            </div>
           </div>
         </div>
       ) : (
@@ -874,58 +876,58 @@ export default function CalendarioPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3">
-              <span className="h-11 w-11 rounded-xl bg-brand-secondary/20 flex items-center justify-center shrink-0">
-                <CalendarCheck className="h-5 w-5 text-brand-primary" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-6">
+            <div className="min-w-0 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3 md:p-4 flex items-center gap-2.5 md:gap-3">
+              <span className="h-9 w-9 md:h-11 md:w-11 rounded-xl bg-brand-secondary/20 flex items-center justify-center shrink-0">
+                <CalendarCheck className="h-4 w-4 md:h-5 md:w-5 text-brand-primary" />
               </span>
               <div className="min-w-0">
-                <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+                <p className="font-sans text-[10px] md:text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide truncate">
                   Disponibilidad
                 </p>
-                <p className="font-sans font-bold text-xl text-neutral-900 dark:text-neutral-50">
+                <p className="font-sans font-bold text-base md:text-xl text-neutral-900 dark:text-neutral-50 truncate">
                   {disponibilidad}%
                 </p>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3">
-              <span className="h-11 w-11 rounded-xl bg-success/15 flex items-center justify-center shrink-0">
-                <Wallet className="h-5 w-5 text-success" />
+            <div className="min-w-0 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3 md:p-4 flex items-center gap-2.5 md:gap-3">
+              <span className="h-9 w-9 md:h-11 md:w-11 rounded-xl bg-success/15 flex items-center justify-center shrink-0">
+                <Wallet className="h-4 w-4 md:h-5 md:w-5 text-success" />
               </span>
               <div className="min-w-0">
-                <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+                <p className="font-sans text-[10px] md:text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide truncate">
                   Recaudación Hoy
                 </p>
-                <p className="font-sans font-bold text-xl text-neutral-900 dark:text-neutral-50">
+                <p className="font-sans font-bold text-base md:text-xl text-neutral-900 dark:text-neutral-50 truncate">
                   S/ {recaudacionHoy.toFixed(2)}
                 </p>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3">
-              <span className="h-11 w-11 rounded-xl bg-danger/15 flex items-center justify-center shrink-0">
-                <CreditCard className="h-5 w-5 text-danger" />
+            <div className="min-w-0 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3 md:p-4 flex items-center gap-2.5 md:gap-3">
+              <span className="h-9 w-9 md:h-11 md:w-11 rounded-xl bg-danger/15 flex items-center justify-center shrink-0">
+                <CreditCard className="h-4 w-4 md:h-5 md:w-5 text-danger" />
               </span>
               <div className="min-w-0">
-                <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+                <p className="font-sans text-[10px] md:text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide truncate">
                   Pagos Pendientes
                 </p>
-                <p className="font-sans font-bold text-xl text-neutral-900 dark:text-neutral-50">
+                <p className="font-sans font-bold text-base md:text-xl text-neutral-900 dark:text-neutral-50 truncate">
                   S/ {pagosPendientes.toFixed(2)}
                 </p>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3">
-              <span className="h-11 w-11 rounded-xl bg-brand-secondary/20 flex items-center justify-center shrink-0">
-                <TrendingUp className="h-5 w-5 text-brand-primary" />
+            <div className="min-w-0 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3 md:p-4 flex items-center gap-2.5 md:gap-3">
+              <span className="h-9 w-9 md:h-11 md:w-11 rounded-xl bg-brand-secondary/20 flex items-center justify-center shrink-0">
+                <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-brand-primary" />
               </span>
               <div className="min-w-0">
-                <p className="font-sans text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+                <p className="font-sans text-[10px] md:text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide truncate">
                   Ocupación Pico
                 </p>
-                <p className="font-sans font-bold text-xl text-neutral-900 dark:text-neutral-50">
+                <p className="font-sans font-bold text-base md:text-xl text-neutral-900 dark:text-neutral-50 truncate">
                   {ocupacionPico}
                 </p>
               </div>

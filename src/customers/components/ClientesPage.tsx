@@ -290,10 +290,11 @@ export default function ClientesPage() {
                     <div className="flex items-center justify-end gap-3 pr-3">
                       <button
                         onClick={() => verHistorial(c)}
-                        className="flex items-center gap-1 font-sans text-sm text-brand-primary hover:underline"
+                        aria-label="Ver historial"
+                        title="Ver historial"
+                        className="text-neutral-400 dark:text-neutral-500 hover:text-brand-primary"
                       >
                         <Eye className="h-4 w-4" />
-                        Historial
                       </button>
                       <button
                         onClick={() => abrirEditar(c)}
@@ -458,31 +459,35 @@ export default function ClientesPage() {
                     href={whatsappLink(c.phone)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 font-sans text-sm font-medium text-success"
+                    aria-label="Escribir por WhatsApp"
+                    title="Escribir por WhatsApp"
+                    className="text-success"
                   >
-                    <MessageSquare className="h-4 w-4" />
-                    WhatsApp
+                    <MessageSquare className="h-5 w-5" />
                   </a>
                   <button
                     onClick={() => verHistorial(c)}
-                    className="flex items-center gap-1.5 font-sans text-sm font-medium text-brand-primary"
+                    aria-label="Ver historial"
+                    title="Ver historial"
+                    className="text-brand-primary"
                   >
-                    <Eye className="h-4 w-4" />
-                    Historial
+                    <Eye className="h-5 w-5" />
                   </button>
                   <button
                     onClick={() => abrirEditar(c)}
-                    className="flex items-center gap-1.5 font-sans text-sm font-medium text-neutral-700 dark:text-neutral-200"
+                    aria-label="Editar cliente"
+                    title="Editar cliente"
+                    className="text-neutral-700 dark:text-neutral-200"
                   >
-                    <Pencil className="h-4 w-4" />
-                    Editar
+                    <Pencil className="h-5 w-5" />
                   </button>
                   <button
                     onClick={() => pedirEliminarCliente(c)}
                     className="text-danger"
                     aria-label="Eliminar cliente"
+                    title="Eliminar cliente"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-5 w-5" />
                   </button>
                 </div>
               </div>

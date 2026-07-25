@@ -35,8 +35,8 @@ function NotificationsPanel({
         onClick={onClose}
       />
       <div
-        className={`absolute top-full mt-2 w-80 max-w-[85vw] bg-white dark:bg-neutral-800 rounded-2xl shadow-lg border border-neutral-200 dark:border-neutral-700 z-50 overflow-hidden ${
-          align === 'right' ? 'right-0' : 'left-0'
+        className={`fixed inset-x-4 top-20 md:absolute md:inset-x-auto md:top-full md:mt-2 md:w-80 bg-white dark:bg-neutral-800 rounded-2xl shadow-lg border border-neutral-200 dark:border-neutral-700 z-50 overflow-hidden ${
+          align === 'right' ? 'md:right-0' : 'md:left-0'
         }`}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100 dark:border-neutral-700">

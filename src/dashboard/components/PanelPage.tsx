@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   CalendarDays,
   Wallet,
@@ -180,6 +180,16 @@ export default function PanelPage() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const [menuAbierto, setMenuAbierto] = useState<number | null>(null)
+  const [pistaFabVisible, setPistaFabVisible] = useState(false)
+
+  useEffect(() => {
+    const aparecer = setTimeout(() => setPistaFabVisible(true), 900)
+    const desaparecer = setTimeout(() => setPistaFabVisible(false), 3600)
+    return () => {
+      clearTimeout(aparecer)
+      clearTimeout(desaparecer)
+    }
+  }, [])
 
   const hoy = new Date().toLocaleDateString('es-PE', {
     weekday: 'long',
@@ -534,7 +544,11 @@ export default function PanelPage() {
       </p>
 
       <div className="md:hidden group fixed bottom-24 right-5 z-30">
-        <span className="pointer-events-none absolute right-full top-1/2 -translate-y-1/2 mr-3 whitespace-nowrap rounded-full bg-neutral-900 dark:bg-neutral-700 text-white font-sans text-sm font-medium px-4 py-2 shadow-lg opacity-0 translate-x-2 transition-all duration-200 ease-out group-hover:opacity-100 group-hover:translate-x-0">
+        <span
+          className={`pointer-events-none absolute right-full top-1/2 -translate-y-1/2 mr-3 whitespace-nowrap rounded-full bg-neutral-900 dark:bg-neutral-700 text-white font-sans text-sm font-medium px-4 py-2 shadow-lg transition-all duration-300 ease-out group-hover:opacity-100 group-hover:translate-x-0 ${
+            pistaFabVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'
+          }`}
+        >
           Nueva reserva
         </span>
         <button
