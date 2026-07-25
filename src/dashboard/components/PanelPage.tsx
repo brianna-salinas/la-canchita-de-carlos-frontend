@@ -110,18 +110,19 @@ function OcupacionCard({ ocupacion }: { ocupacion: DayOccupancy[] }) {
           )
         })}
       </div>
-      <div className="flex justify-between mt-2">
+      <div className="flex gap-1.5 px-2 mt-2">
         {DIAS_SEMANA.map((d, i) => (
-          <span
-            key={d + i}
-            className={`font-sans text-xs w-6 text-center ${
-              toISODate(ocupacion[i]?.date ?? new Date()) === isoHoy
-                ? 'font-bold text-neutral-900 dark:text-neutral-50'
-                : 'text-neutral-400 dark:text-neutral-500'
-            }`}
-          >
-            {d}
-          </span>
+          <div key={d + i} className="flex-1 text-center">
+            <span
+              className={`font-sans text-xs ${
+                toISODate(ocupacion[i]?.date ?? new Date()) === isoHoy
+                  ? 'font-bold text-neutral-900 dark:text-neutral-50'
+                  : 'text-neutral-400 dark:text-neutral-500'
+              }`}
+            >
+              {d}
+            </span>
+          </div>
         ))}
       </div>
     </div>

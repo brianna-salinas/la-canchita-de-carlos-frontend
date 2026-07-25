@@ -554,7 +554,7 @@ export default function CalendarioPage() {
 
       {vista === 'semana' ? (
         <>
-          <div className="mt-6 grid grid-cols-7 gap-2">
+          <div className="mt-6 flex md:grid md:grid-cols-7 gap-2 overflow-x-auto pb-1 md:pb-0 md:overflow-visible">
             {getWeekDates(fecha).map((dia) => {
               const iso = toISODate(dia)
               const reservasDia = reservas.filter(
@@ -567,7 +567,7 @@ export default function CalendarioPage() {
                 <button
                   key={iso}
                   onClick={() => irADia(dia)}
-                  className={`rounded-xl border p-2 md:p-3 text-left transition-colors ${
+                  className={`shrink-0 w-[104px] md:w-auto rounded-xl border p-2.5 md:p-3 text-left transition-colors ${
                     esSeleccionado
                       ? 'border-brand-primary bg-brand-primary/10'
                       : esHoyCol
@@ -581,10 +581,10 @@ export default function CalendarioPage() {
                   <p className="font-sans font-bold text-lg text-neutral-900 dark:text-neutral-50">
                     {dia.getDate()}
                   </p>
-                  <p className="font-sans text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
+                  <p className="font-sans text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 truncate">
                     {reservasDia.length} {reservasDia.length === 1 ? 'reserva' : 'reservas'}
                   </p>
-                  <p className="font-sans text-[11px] font-semibold text-success mt-0.5">
+                  <p className="font-sans text-[11px] font-semibold text-success mt-0.5 truncate">
                     S/ {recaudacionDia.toFixed(2)}
                   </p>
                 </button>
