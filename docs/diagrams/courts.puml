@@ -1,0 +1,25 @@
+@startuml courts-module
+title Módulo Frontend: Courts (Canchas)
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "courts.components" {
+  class CanchasPage {
+    +canchaAEliminar: Court?
+    +canchaSeleccionada: Court?
+  }
+  class NuevaCanchaPage {
+    +modo: 'crear' | 'editar'
+  }
+
+  CanchasPage ..> "bookings.hooks.useAllCourts"
+  CanchasPage ..> "bookings.hooks.useBookings"
+  CanchasPage ..> "bookings.components.ProgramarMantenimientoModal"
+  CanchasPage ..> "bookings.components.MantenimientosProgramadosModal"
+  CanchasPage ..> "shared.api.apiClient" : crear/editar/eliminar cancha,\nsubir foto, actualizar precio
+  NuevaCanchaPage ..> "bookings.hooks.useAllCourts"
+  NuevaCanchaPage ..> "shared.api.apiClient" : crear/editar cancha,\nsubir foto
+}
+
+@enduml
