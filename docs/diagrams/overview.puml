@@ -6,7 +6,7 @@ skinparam componentStyle rectangle
 
 package "auth" {
   [AuthProvider / useAuth]
-  [LoginPage, RequestAccessPage,\nForgotPasswordPage, VerificarCorreoPage]
+  [LoginPage, RequestAccessPage,\nSolicitudEnviadaPage, ForgotPasswordPage,\nResetPasswordPage, VerificarCorreoPage]
 }
 
 package "bookings" {
@@ -48,8 +48,11 @@ package "shared" {
 [AuthProvider / useAuth] --> [apiClient / queryClient]
 
 [CanchasPage, NuevaCanchaPage] --> [useCalendario (hooks)]
+[CanchasPage, NuevaCanchaPage] --> [CalendarioPage, NuevaReservaPage,\nReservasPage, Mantenimiento*Modal] : reutiliza los modales\nde mantenimiento
 
 [usePanelData] --> [useCalendario (hooks)]
+
+[CalendarioPage, NuevaReservaPage,\nReservasPage, Mantenimiento*Modal] --> [useCustomers] : busca cliente\nal reservar
 
 [CalendarioPage, NuevaReservaPage,\nReservasPage, Mantenimiento*Modal] --> [AppShell, ProtectedRoute,\nMetodoPagoIcon]
 [CanchasPage, NuevaCanchaPage] --> [AppShell, ProtectedRoute,\nMetodoPagoIcon]
