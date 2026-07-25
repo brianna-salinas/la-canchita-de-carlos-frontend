@@ -9,6 +9,7 @@ import {
   TriangleAlert,
   User,
   UserPlus,
+  Users,
   LogOut,
   Trash2,
   X,
@@ -16,12 +17,19 @@ import {
 import AppShell from '../../shared/components/AppShell'
 import { useAuth } from '../../auth/useAuth'
 import { useAccessRequests, useApproveAccessRequest, useRejectAccessRequest } from '../hooks/useSolicitudes'
+import { useAdminUsers, formatLastActive } from '../hooks/useUsuarios'
 import { apiClient } from '../../shared/api/client'
 import { initials } from '../../shared/utils/format'
 import { getApiErrorMessage } from '../../shared/utils/api-error'
 import { isValidEmail, validateImageFile } from '../../shared/utils/validation'
 
 type Modo = null | 'perfil' | 'usuario' | 'correo' | 'password'
+
+function esRecienActivo(iso?: string) {
+  if (!iso) return false
+  const horas = (Date.now() - new Date(iso).getTime()) / 3600000
+  return horas < 24
+}
 
 export default function AjustesPage() {
   const navigate = useNavigate()
@@ -30,9 +38,11 @@ export default function AjustesPage() {
   const { data: solicitudes = [] } = useAccessRequests()
   const aprobar = useApproveAccessRequest()
   const rechazar = useRejectAccessRequest()
+  const { data: usuarios = [] } = useAdminUsers()
   const fotoInputRef = useRef<HTMLInputElement>(null)
 
   const pendientes = solicitudes.filter((s) => s.status === 'PENDING')
+  const usuariosActivos = usuarios.filter((u) => esRecienActivo(u.lastAccess))
   const nombre = user?.name ?? 'Carlos Maldonado'
   const correo = user?.email ?? 'carlos@lacanchita.com'
   const nombreUsuario = user?.username ?? correo.split('@')[0]
@@ -297,6 +307,21 @@ export default function AjustesPage() {
               <ChevronRight className="h-4 w-4 text-neutral-300 shrink-0" />
             </button>
           )}
+          {user?.isOwner && (
+            <button
+              onClick={() => navigate('/ajustes/solicitudes', { state: { tab: 'aprobados' } })}
+              className="w-full bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4 flex items-center gap-3"
+            >
+              <Users className="h-5 w-5 text-brand-primary shrink-0" />
+              <span className="flex-1 min-w-0 text-left font-sans text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                Usuarios activos
+              </span>
+              <span className="shrink-0 h-5 min-w-[20px] px-1.5 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-[11px] font-bold flex items-center justify-center">
+                {usuariosActivos.length}
+              </span>
+              <ChevronRight className="h-4 w-4 text-neutral-300 shrink-0" />
+            </button>
+          )}
         </div>
 
         <div className="bg-danger/5 border border-danger/20 rounded-2xl mt-6 p-4">
@@ -484,6 +509,60 @@ export default function AjustesPage() {
                 ))}
               </div>
             </>
+          )}
+        </div>
+      </div>
+      )}
+
+      {user?.isOwner && (
+      <div className="hidden md:block bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 mt-5">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 dark:border-neutral-700/60">
+          <div className="flex items-center gap-2">
+            <p className="font-sans text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+              Usuarios Activos
+            </p>
+            <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-[11px] font-bold flex items-center justify-center">
+              {usuariosActivos.length}
+            </span>
+          </div>
+          <button
+            onClick={() => navigate('/ajustes/solicitudes', { state: { tab: 'aprobados' } })}
+            className="font-sans text-sm font-semibold text-brand-primary hover:underline"
+          >
+            Ver todos
+          </button>
+        </div>
+
+        <div className="p-6">
+          {usuarios.length === 0 ? (
+            <p className="font-sans text-sm text-neutral-400 dark:text-neutral-500">
+              Todavía no hay usuarios con acceso.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {usuarios.slice(0, 3).map((u) => (
+                <div key={u.id} className="border border-neutral-200 dark:border-neutral-700 rounded-xl p-4 flex items-center gap-3">
+                  {u.photoUrl ? (
+                    <img src={u.photoUrl} alt={u.name} className="h-10 w-10 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <span className="h-10 w-10 rounded-full bg-brand-secondary/25 text-brand-primary font-sans text-sm font-bold flex items-center justify-center shrink-0">
+                      {initials(u.name)}
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-sans font-semibold text-sm text-neutral-900 dark:text-neutral-50 truncate">{u.name}</p>
+                    <p className="flex items-center gap-1.5 font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          esRecienActivo(u.lastAccess) ? 'bg-brand-primary' : 'bg-neutral-300'
+                        }`}
+                      />
+                      {formatLastActive(u.lastAccess)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

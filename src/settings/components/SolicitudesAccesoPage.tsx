@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { ArrowLeft, ClipboardCheck, Mail, CalendarDays, Check, X, Lock, Trash2 } from 'lucide-react'
 import AppShell from '../../shared/components/AppShell'
@@ -22,7 +22,9 @@ function esRecienActivo(iso?: string) {
 
 export default function SolicitudesAccesoPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
+  const tabInicial = (location.state as { tab?: 'pendientes' | 'aprobados' } | null)?.tab ?? 'pendientes'
 
   useEffect(() => {
     if (user && !user.isOwner) {
@@ -36,7 +38,7 @@ export default function SolicitudesAccesoPage() {
   const { data: usuarios = [] } = useAdminUsers()
   const desactivarUsuario = useDeactivateAdminUser()
 
-  const [tab, setTab] = useState<'pendientes' | 'aprobados'>('pendientes')
+  const [tab, setTab] = useState<'pendientes' | 'aprobados'>(tabInicial)
 
   const pendientes = solicitudes.filter((s) => s.status === 'PENDING')
   const usuariosAprobados = usuarios.filter((u) => !u.isOwner && u.status === 'ACTIVE')
