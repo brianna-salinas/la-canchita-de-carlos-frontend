@@ -178,7 +178,7 @@ export default function SolicitudesAccesoPage() {
         )}
 
         <p className="text-center font-sans text-xs text-neutral-400 dark:text-neutral-500 pt-4">
-          Desarrollado por Brianna Salinas | 2026
+          Oryon Copyright © 2026. All rights reserved.
         </p>
       </div>
 

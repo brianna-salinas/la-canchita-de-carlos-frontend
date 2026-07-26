@@ -935,7 +935,7 @@ export default function CalendarioPage() {
           </div>
 
           <p className="md:hidden text-center font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-8">
-            Desarrollado por Brianna Salinas | 2026
+            Oryon Copyright © 2026. All rights reserved.
           </p>
           <div className="md:hidden flex gap-3 mt-4">
             <button

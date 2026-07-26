@@ -427,7 +427,7 @@ export default function CanchasPage() {
         </div>
 
         <p className="text-center font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-8">
-          Desarrollado por Brianna Salinas | 2026
+          Oryon Copyright © 2026. All rights reserved.
         </p>
       </div>
 

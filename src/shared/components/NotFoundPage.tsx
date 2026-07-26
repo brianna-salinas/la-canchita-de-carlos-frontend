@@ -38,7 +38,7 @@ export default function NotFoundPage() {
       </Link>
 
       <p className="font-sans text-xs text-neutral-400 dark:text-neutral-500 mt-4">
-        Desarrollado por Brianna Salinas | 2026
+        Oryon Copyright © 2026. All rights reserved.
       </p>
     </div>
   )

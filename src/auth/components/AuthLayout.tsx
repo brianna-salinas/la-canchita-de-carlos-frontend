@@ -30,7 +30,7 @@ export default function AuthLayout({
 export function AuthFooter() {
   return (
     <p className="mt-8 text-center text-xs text-neutral-400 dark:text-neutral-500 font-sans">
-      Desarrollado por Brianna Salinas | 2026
+      Oryon Copyright © 2026. All rights reserved.
     </p>
   )
 }

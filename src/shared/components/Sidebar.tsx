@@ -77,7 +77,7 @@ export default function Sidebar() {
           Cerrar Sesión
         </button>
         <p className="font-sans text-xs text-neutral-500 px-3 mt-4">
-          Desarrollado por Brianna Salinas | 2026
+          Oryon Copyright © 2026. All rights reserved.
         </p>
       </div>
     </aside>
