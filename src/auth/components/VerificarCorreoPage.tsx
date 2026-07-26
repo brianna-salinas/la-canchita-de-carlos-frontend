@@ -21,7 +21,7 @@ export default function VerificarCorreoPage() {
     yaIntentadoRef.current = true
 
     apiClient
-      .get('/users/verificar', { params: { token } })
+      .get('/users/verify', { params: { token } })
       .then(() => setEstado('exito'))
       .catch((err) => {
         setEstado('error')

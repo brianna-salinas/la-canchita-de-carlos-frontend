@@ -51,7 +51,7 @@ export function useMarkNotificationRead() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (id: number) => {
-      await apiClient.patch(`/notifications/${id}/leida`)
+      await apiClient.patch(`/notifications/${id}/read`)
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   })

@@ -226,7 +226,7 @@ export default function PanelPage() {
     if (!window.confirm('¿Cancelar este alquiler? Esta acción no se puede deshacer.')) return
     try {
 
-      await apiClient.post(`/bookings/${id}/cancelar`)
+      await apiClient.post(`/bookings/${id}/cancel`)
       await queryClient.invalidateQueries({ queryKey: ['bookings'] })
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo cancelar el alquiler. Intenta de nuevo.'))

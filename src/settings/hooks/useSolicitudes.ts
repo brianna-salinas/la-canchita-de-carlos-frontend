@@ -42,7 +42,7 @@ export function useAccessRequests() {
   return useQuery({
     queryKey: ['accessRequests'],
     queryFn: async () => {
-      const { data } = await apiClient.get('/users/solicitudes')
+      const { data } = await apiClient.get('/users/requests')
       return (data as AccessRequestApiRow[]).map(
         (row): AccessRequest => ({
           id: row.id,
@@ -61,7 +61,7 @@ export function useApproveAccessRequest() {
   return async (request: AccessRequest) => {
     try {
 
-      await apiClient.patch(`/users/solicitudes/${request.id}/autorizar`)
+      await apiClient.patch(`/users/requests/${request.id}/approve`)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['accessRequests'] }),
         queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
@@ -76,7 +76,7 @@ export function useRejectAccessRequest() {
   const queryClient = useQueryClient()
   return async (id: number) => {
     try {
-      await apiClient.patch(`/users/solicitudes/${id}/rechazar`)
+      await apiClient.patch(`/users/requests/${id}/reject`)
       await queryClient.invalidateQueries({ queryKey: ['accessRequests'] })
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo rechazar la solicitud. Intenta de nuevo.'))

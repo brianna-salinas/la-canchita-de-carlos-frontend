@@ -1,4 +1,4 @@
-@startuml frontend-overview
+ @startuml frontend-overview
 title La Canchita de Carlos — Mapa de módulos
 
 skinparam packageStyle rectangle

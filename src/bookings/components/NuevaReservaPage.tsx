@@ -445,7 +445,7 @@ export default function NuevaReservaPage() {
           ? `Reserva de ${fechas.length} días seguidos`
           : `Reserva recurrente semanal (${fechas.length} fechas)`
 
-      const { data: creadas } = await apiClient.post('/bookings/serie', {
+      const { data: creadas } = await apiClient.post('/bookings/series', {
         courtId: canchaSeleccionada.id,
         customerId,
         customerName: clienteSeleccionado.name,

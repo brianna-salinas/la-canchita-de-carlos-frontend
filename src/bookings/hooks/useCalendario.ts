@@ -95,8 +95,8 @@ export function useCourts() {
   return useQuery({
     queryKey: ['courts'],
     queryFn: async () => {
-      const { data } = await apiClient.get('/courts/disponibilidad', {
-        params: { fecha: today() },
+      const { data } = await apiClient.get('/courts/availability', {
+        params: { date: today() },
       })
       return (data as CourtAvailabilityApiRow[]).map(mapCourtRow)
     },
@@ -151,8 +151,8 @@ export function useBookings() {
 }
 
 async function fetchScheduleBlocksForDate(date: string): Promise<ScheduleBlock[]> {
-  const { data } = await apiClient.get('/courts/disponibilidad', {
-    params: { fecha: date },
+  const { data } = await apiClient.get('/courts/availability', {
+    params: { date },
   })
   const blocks: ScheduleBlock[] = []
   for (const court of data as CourtAvailabilityApiRow[]) {
@@ -205,7 +205,7 @@ export function useScheduleMaintenance() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (input: ScheduleMaintenanceInput) => {
-      const { data } = await apiClient.post(`/courts/${input.courtId}/bloqueos/serie`, {
+      const { data } = await apiClient.post(`/courts/${input.courtId}/blocks/series`, {
         dates: input.dates,
         startTime: input.startTime,
         endTime: input.endTime,
@@ -239,7 +239,7 @@ export function useUpcomingMaintenance(courtId: number | null) {
     queryKey: ['maintenanceBlocks', courtId],
     enabled: courtId != null,
     queryFn: async () => {
-      const { data } = await apiClient.get(`/courts/${courtId}/bloqueos/proximos`)
+      const { data } = await apiClient.get(`/courts/${courtId}/blocks/upcoming`)
       return (data as MaintenanceBlockApiRow[]).map(
         (row): MaintenanceBlock => ({
           id: row.id,
@@ -256,7 +256,7 @@ export function useCancelMaintenanceBlock() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (blockId: number) => {
-      await apiClient.delete(`/courts/bloqueos/${blockId}`)
+      await apiClient.delete(`/courts/blocks/${blockId}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenanceBlocks'] })

@@ -122,7 +122,7 @@ export default function NuevaCanchaPage() {
           closeTime,
           enabled: form.habilitada,
         })
-        await apiClient.patch(`/courts/${canchaId}/precio`, {
+        await apiClient.patch(`/courts/${canchaId}/price`, {
           pricePerHour: Number(form.precioHora) || 0,
         })
       } else {
@@ -146,8 +146,8 @@ export default function NuevaCanchaPage() {
 
       if (fotoArchivo && canchaId) {
         const formData = new FormData()
-        formData.append('foto', fotoArchivo)
-        await apiClient.post(`/courts/${canchaId}/fotos`, formData, {
+        formData.append('photo', fotoArchivo)
+        await apiClient.post(`/courts/${canchaId}/photos`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
       }

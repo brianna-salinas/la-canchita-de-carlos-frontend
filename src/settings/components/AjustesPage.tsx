@@ -82,13 +82,13 @@ export default function AjustesPage() {
     setGuardando(true)
     try {
       if (formPerfil.nombre.trim() !== nombre || formPerfil.nombreUsuario.trim() !== nombreUsuario) {
-        await apiClient.patch('/users/me/perfil', {
+        await apiClient.patch('/users/me/profile', {
           name: formPerfil.nombre.trim(),
           username: formPerfil.nombreUsuario.trim(),
         })
       }
       if (formPerfil.correo.trim() !== correo) {
-        await apiClient.patch('/users/me/correo', { email: formPerfil.correo.trim() })
+        await apiClient.patch('/users/me/email', { email: formPerfil.correo.trim() })
       }
       updateUser({
         name: formPerfil.nombre.trim(),
@@ -121,7 +121,7 @@ export default function AjustesPage() {
     setError('')
     setGuardando(true)
     try {
-      await apiClient.patch('/users/me/contrasena', {
+      await apiClient.patch('/users/me/password', {
         currentPassword: formPassword.actual,
         newPassword: formPassword.nueva,
       })
@@ -142,9 +142,9 @@ export default function AjustesPage() {
     }
     setSubiendoFoto(true)
     const formData = new FormData()
-    formData.append('foto', archivo)
+    formData.append('photo', archivo)
     apiClient
-      .post(`/users/${user.id}/foto`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      .post(`/users/${user.id}/photo`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
       .then(({ data }) => {
         updateUser({ photoUrl: data.photoUrl ?? undefined })
         return queryClient.invalidateQueries({ queryKey: ['adminUsers'] })
@@ -160,7 +160,7 @@ export default function AjustesPage() {
     if (!window.confirm('¿Eliminar tu foto de perfil?')) return
     setSubiendoFoto(true)
     try {
-      await apiClient.delete(`/users/${user.id}/foto`)
+      await apiClient.delete(`/users/${user.id}/photo`)
       updateUser({ photoUrl: undefined })
       await queryClient.invalidateQueries({ queryKey: ['adminUsers'] })
     } catch (err) {

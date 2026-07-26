@@ -255,7 +255,7 @@ export default function ReservasPage() {
       return
     }
     try {
-      await apiClient.post(`/bookings/${id}/cancelar`)
+      await apiClient.post(`/bookings/${id}/cancel`)
       await queryClient.invalidateQueries({ queryKey: ['bookings'] })
     } catch (err) {
       window.alert(getApiErrorMessage(err, 'No se pudo cancelar la reserva. Intenta de nuevo.'))
